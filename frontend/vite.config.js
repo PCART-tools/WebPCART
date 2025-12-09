@@ -8,15 +8,23 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 export default defineConfig({
   plugins: [
     vue(),
-    vueDevTools(),
+    vueDevTools()
   ],
+  resolve:{
+    alias:{
+      '@':fileURLToPath(new URL('./src',import.meta.url))
+    }
+  },
   server:{
     proxy:{
       '/api':{
         target:'http://localhost:5000',
         changeOrigin:true,
-        rewrutePath:(path)=>path.replace(/^\/api/,'')
+        rewrite:(path)=>path.replace(/^\/api/,'')
       }
     }
+  },
+  optimizeDeps:{
+    include: ['monaco-editor']
   }
 })
