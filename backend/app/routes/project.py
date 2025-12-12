@@ -1,6 +1,8 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, send_from_directory, send_file
 import os
 import json
+import zipfile
+from io import BytesIO
 
 project_bp = Blueprint('project', __name__)
 
@@ -130,3 +132,51 @@ def get_project_tree():
         "tree": tree,
         "status": "success"
     })
+
+@project_bp.route('/project/download', methods=['POST'])
+def download_file():
+    try:
+        data = request.get_json()
+        project_name = data.get('projectName')
+        path = data.get('path')
+        item_type = data.get('type')
+
+        if not project_name or not path:
+            return jsonify({
+                "message": "projectName and path are required",
+                "status": "error"
+            }), 400
+        
+        project_dir = os.path.join(PROJECTS_ROOT, project_name)
+        target_path = os.path.join(project_dir, path)
+
+        if not os.path.exists(target_path):
+            return jsonify({
+                "message": "File does not exist",
+                "status": "error"
+            }), 400
+        
+        if item_type == "file":
+            directory = os.path.dirname(target_path)
+            filename = os.path.basename(target_path)
+            return send_from_directory(directory, filename, as_attachment=True)
+        else:
+            memory_file = BytesIO()
+            with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for root, dirs, files in os.walk(target_path):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        relative_path = os.path.relpath(file_path, project_dir)
+                        zipf.write(file_path, relative_path)
+
+            memory_file.seek(0)
+
+            return send_file(memory_file,
+                            mimetype='application/zip',
+                            as_attachment=True,
+                            download_name=f'{os.path.basename(path)}.zip')
+    except Exception as e:
+        return jsonify({
+            "message": "Download failed:" + str(e),
+            "status": "error"
+        }), 400    

@@ -30,9 +30,12 @@
                     <div class="project-header">
                         <i class="fas fa-folder folder-icon"></i>
                         <span class="project-path">{{project}}</span>
+                        <button class="downloadProject" title="Download Project" @click="downloadProject">
+                            <i class="fas fa-download"></i>
+                        </button>
                     </div>
                     <div v-if="fileTree" class="file-tree">
-                        <tree-view :tree-data="fileTree"/>
+                        <tree-view :tree-data="fileTree" :project-name="project"/>
                     </div>
                 </div>
             </div>
@@ -107,33 +110,118 @@ import * as monaco from 'monaco-editor'
 // 文件节点视图
 const TreeNode = {
     name: 'TreeNode',
-    props: ['node'],
+    props: ['node', 'projectName', 'basePath'],
     template: ` 
         <li>
-            <div class="tree-node">
+            <div class="tree-node" @click="handleNodeClick">
                 <i v-if="node.type === 'directory'"
-                    class= "fas fa-folder folder-icon"
+                    @click.stop="toggleDirectory"
+                    class="folder-toggle"
+                    :class="isExpanded ? 'fa fa-chevron-down' : 'fa fa-chevron-right'">
+                </i>
+                <i v-if="node.type === 'directory'"
+                    class= "fas fa-file folder-icon"
                 ></i>
                 <i v-else
                     class= "fas fa-file file-icon"
                 ></i>
                 <span>{{node.name}}</span> 
+                <button @click.stop="downloadItem(node)" class="download-button" title="Download">
+                    <i class="fas fa-download"></i>
+                </button>
             </div>
-            <ul v-if="node.type === 'directory' && node.children && node.children.length">
+            <ul v-if="node.type === 'directory' && node.children && node.children.length && isExpanded">
                 <tree-node 
                     v-for="(child, index) in node.children"
                     :key="index"
                     :node="child"
+                    :project-name="projectName"
+                    :base-path="getCurrentPath()"
                 />
             </ul>
         </li>
-    `
+    `,
+    data(){
+        return{
+            isExpanded: false
+        }
+    },
+    methods:{
+        toggleDirectory(){
+            this.isExpanded = !this.isExpanded;
+        },
+        handleNodeClick(){
+            if(this.node.type === 'file'){
+                alert('File clicked: ' + this.node.name);
+            }else if(this.node.type === 'directory'){
+                this.toggleDirectory();
+            }
+        },
+        getCurrentPath(){
+            if(this.basePath){
+                return this.basePath + '/' + this.node.name;
+            }
+            return this.node.name;
+        },
+        async downloadItem(){
+            try{
+                const fullPath = this.getCurrentPath();
+
+                const response = await fetch(`http://localhost:5000/project/download`, {
+                    method: 'POST',
+                    headers:{
+                        'Content-Type':'application/json'
+                    },
+                    body: JSON.stringify({
+                        projectName: this.projectName,
+                        path: fullPath,
+                        type: this.node.type
+                    })
+                });
+
+                if(response.ok){
+                    let filename = this.node.name;
+                    if(this.node.type !== 'file'){
+                        filename = `${this.node.name}.zip`;
+                    }
+
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                }else{
+                    const error = await response.json();
+                    alert("Download Failed:" + error.message);
+                }
+            }catch(error){
+                console.error('Download Failed:', error);
+                alert('Download Failed:');
+            }
+        },
+        buildPath(node){
+            const paths = [];
+            let currentNode = node;
+
+            while(currentNode){
+                paths.unshift(currentNode.name);
+                break;
+            }
+
+            return node.name;
+        }
+    }
 }
 
 // 文件树视图
 const TreeView = {
     name: 'TreeView',
-    props: ['treeData'],
+    props: ['treeData', 'projectName'],
     components:{
         TreeNode
     },
@@ -143,6 +231,8 @@ const TreeView = {
                 v-for="(node, index) in treeData.children"
                 :key="index"
                 :node="node"
+                :project-name="projectName"
+                :base-path="''"
             />
         </ul>
     `
@@ -271,6 +361,41 @@ const loadCurrentProject = async() => {
     }
 }
 
+const downloadProject = async() => {
+    try{
+        const response = await fetch(`http://localhost:5000/project/download`, {
+            method: 'POST',
+            headers:{
+                'Content-Type':'application/json'
+            },
+            body: JSON.stringify({
+                projectName: project.value,
+                path: '.',
+                type: 'project'
+            })
+        });
+
+        if(response.ok){
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+
+            a.href = url;
+            a.download = project.value + '.zip';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }else{
+            const error = await response.json();
+            alert("Download Failed:" + error.message);
+        }
+    }catch(error){
+        console.error('Download Failed:', error);
+        alert('Download Failed:');
+    }
+}
+
 const showInfo = (info) => {
     alert(info + ' button clicked');
 }
@@ -362,6 +487,7 @@ onUnmounted(() => {
 <style>
 @import url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css");
 
+/* 全局样式 */
 * {
     margin: 0;
     padding: 0;
@@ -378,6 +504,7 @@ onUnmounted(() => {
     overflow-x: hidden;
 }
 
+/* 功能栏 */
 .function-bar{
     height: 60px;
     border-bottom: 1px solid #e0e0e0;
@@ -411,6 +538,7 @@ onUnmounted(() => {
 
 }
 
+/* 项目拉伸 */
 .app-wrapper{
     display: flex;
     min-width: 200px;
@@ -427,6 +555,7 @@ onUnmounted(() => {
     cursor: col-resize;
 }
 
+/* 项目管理栏 */
 .app-project{
     width: 240px;
     border-right: 1px solid #e0e0e0;
@@ -461,6 +590,13 @@ onUnmounted(() => {
     border-radius: 5px;
 }
 
+.folder-toggle{
+    margin-right: 5px;
+    cursor: pointer;
+    width: 12px;
+    text-align: center;
+}
+
 .folder-icon{
     color: #FFA500
 }
@@ -484,8 +620,34 @@ onUnmounted(() => {
     align-items: center;
     gap: 5px;
     padding: 3px 0;
+    cursor: pointer;
+    user-select: none;
 }
 
+.tree-node:hover{
+    background-color: #d2e0e7;
+}
+
+.download-button{
+    margin-left: auto;
+    background: none;
+    border: none;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+    padding: 2px 5px;
+}
+
+.tree-node:hover .download-button{
+    opacity: 1;
+}
+
+.download-button:hover{
+    background-color: #e0e0e0;
+    border-radius: 3px;
+}
+
+/* 中心部分 */
 .app-middle{
     flex: 1;
     display: flex;
@@ -493,6 +655,7 @@ onUnmounted(() => {
     border-right: 1px solid #e0e0e0;
 }
 
+/* 虚拟环境配置栏 */
 .app-config{
     height: 130px;
     padding: 10px;
@@ -537,6 +700,7 @@ onUnmounted(() => {
     background: #50f9ffff;
  }
 
+ /* 项目目标配置栏 */
 .app-target{
     flex: 1;
     padding: 0 10px;
@@ -563,6 +727,7 @@ onUnmounted(() => {
     margin: 0 auto;
 }
 
+/* 代码编辑栏 */
 .app-code{
     flex: 1;
     padding: 10px;
@@ -578,6 +743,7 @@ onUnmounted(() => {
     height: calc(100vh - 200px);
 }
 
+/* 终端栏 */
 .app-result{
     width: 300px;
     position: relative;
