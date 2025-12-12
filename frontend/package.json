@@ -10,7 +10,11 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint . --fix --cache"
+    "lint": "eslint . --fix --cache",
+
+    "dev:front": "npm run dev",
+    "dev:back": "cd ../backend && ./venv/bin/python run.py",
+    "dev:all": "concurrently \"npm run dev:back\" \"npm run dev:front\""
   },
   "dependencies": {
     "axios": "^1.13.2",
@@ -21,6 +25,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@vitejs/plugin-vue": "^6.0.2",
+    "concurrently": "^9.2.1",
     "eslint": "^9.39.1",
     "eslint-plugin-vue": "~10.5.1",
     "globals": "^16.5.0",
