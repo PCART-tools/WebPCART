@@ -28,7 +28,6 @@
                 </div>
                 <div v-if="project" class="current-project">
                     <div class="project-header">
-                        <i class="fas fa-folder folder-icon"></i>
                         <span class="project-path">{{project}}</span>
                         <button class="downloadProject" title="Download Project" @click="downloadProject">
                             <i class="fas fa-download"></i>
@@ -66,7 +65,10 @@
 
                 <!-- 代码编辑栏 -->
                 <div class="app-code">
-                    <div class="editor-container" ref="editorRef"></div>
+                    <div class="editor-container" ref="editorRef" :class="{disabled: !currentFilePath}"></div>
+                    <div v-if="!currentFilePath" class="editor-placeholder">
+                        choose a file(.py / .txt) to edit
+                    </div>
                 </div>
             </div>
 
@@ -106,8 +108,12 @@
 import {ref, onMounted, onUnmounted} from 'vue'
 import * as monaco from 'monaco-editor'
 
-// ---项目导入功能---
+// ---项目栏功能---
 // 文件节点视图
+const currentFilePath = ref(null)
+const originalContent = ref('')
+const isContentModified = ref(false)
+
 const TreeNode = {
     name: 'TreeNode',
     props: ['node', 'projectName', 'basePath'],
@@ -147,23 +153,38 @@ const TreeNode = {
         }
     },
     methods:{
-        toggleDirectory(){
+        toggleDirectory(){  // 展开或折叠文件夹
             this.isExpanded = !this.isExpanded;
         },
-        handleNodeClick(){
+        handleNodeClick(){  // 处理文件点击
             if(this.node.type === 'file'){
-                alert('File clicked: ' + this.node.name);
+                // 检查文件类型
+                const fileName = this.node.name.toLowerCase();
+                if(!fileName.endsWith('.py') && !fileName.endsWith('.txt')){
+                    alert('Editing this type of file is not supported');
+                    return;
+                }
+
+                // 检查是否需要保存上一份文件
+                if(isContentModified.value){
+                    const saveChanges = confirm('The current file has unsaved changes. Do you want to save them?');
+                    if(saveChanges){
+                        saveFile();
+                    }
+                }
+
+                this.loadFileContent();
             }else if(this.node.type === 'directory'){
                 this.toggleDirectory();
             }
         },
-        getCurrentPath(){
+        getCurrentPath(){   // 获取当前节点路径
             if(this.basePath){
                 return this.basePath + '/' + this.node.name;
             }
             return this.node.name;
         },
-        async downloadItem(){
+        async downloadItem(){   // 下载文件
             try{
                 const fullPath = this.getCurrentPath();
 
@@ -204,7 +225,7 @@ const TreeNode = {
                 alert('Download Failed:');
             }
         },
-        buildPath(node){
+        buildPath(node){    // 构建文件路径
             const paths = [];
             let currentNode = node;
 
@@ -214,6 +235,41 @@ const TreeNode = {
             }
 
             return node.name;
+        },
+        async loadFileContent(){    // 加载文件内容
+            try{
+                const fullPath = this.getCurrentPath();
+                const response = await fetch('http://localhost:5000/project/load_file', {
+                    method: 'POST',
+                    headers:{
+                        'Content-Type':'application/json'
+                    },
+                    body: JSON.stringify({
+                        projectName: this.projectName,
+                        filePath: fullPath
+                    })
+                });
+
+                if(response.ok){
+                    const result = await response.json();
+                    if(result.status === 'success'){
+                        currentFilePath.value = fullPath;
+                        originalContent.value = result.content;
+                        if(editor){
+                            editor.setValue(result.content);
+                            isContentModified.value = false;
+                            editor.updateOptions({readOnly: false});
+                        }
+                    }else{
+                        alert('Failed to load file' + result.message);
+                    }
+                }else{
+                    alert('Failed to load file: ' + response.json());
+                }
+            }catch(error){
+                console.error('Error loading file:', error);
+                alert('Error loading file');
+            }
         }
     }
 }
@@ -272,7 +328,7 @@ const selectFolder = async() => {
     }
 }
 
-// 上传文件到后端
+// 上传本地文件到后端
 const uploadFiles = async(projectName, files) => { 
     try{
         const formData = new FormData();
@@ -297,6 +353,37 @@ const uploadFiles = async(projectName, files) => {
     }catch(error){
         console.error('Error uploading files:', error);
         alert('Error uploading files');
+    }
+}
+
+// 保存已修改文件
+const saveFile = async() => {
+    try{
+        const currentContent = editor.getValue();
+
+        const response = await fetch('http://localhost:5000/project/save_file', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                projectName: project.value,
+                filePath: currentFilePath.value,
+                content: currentContent
+            })
+        });
+
+        const result = await response.json();
+        if(result.status === 'success'){
+            originalContent.value = currentContent;
+            isContentModified.value = false;
+            alert('file saved successfully');
+        }else{
+            alert('failed to save file' + result.message);
+        }
+    }catch(error){
+        console.error('Error saving file:', error);
+        alert('Error saving file');
     }
 }
 
@@ -337,6 +424,9 @@ const loadProjectTree = async(projectName) => {
         const result = await response.json();
         if(result.status === 'success'){
             fileTree.value = result.tree;
+            if(!currentFilePath.value && editor){
+                editor.updateOptions({readOnly: true});
+            }
         }else{
             alert('Failed to load project tree' + result.message);
         }
@@ -402,15 +492,15 @@ const showInfo = (info) => {
 
 // ---网页初始化---
 const activeTab = ref('terminal')
-const codeContent = ref(`# 输入代码`)
 const editorRef = ref(null)
 let editor = null
+let handleKeyDown = null
 
 onMounted(() => { 
     // 创建编辑器实例
     if(editorRef.value){
         editor = monaco.editor.create(editorRef.value, {
-            value: codeContent.value,
+            value: ' ',
             language: 'python',
             scrollBeyondLastLine: false,
             fontSize: 14,
@@ -421,15 +511,29 @@ onMounted(() => {
             wordWrap: 'on',
             contextmenu: true,
             automaticLayout: true,
+            readOnly: true,
+            fontFamily: 'ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace'
         })
 
         editor.onDidChangeModelContent(() => {
-            codeContent.value = editor.getValue();
+            const currentContent = editor.getValue();
+            isContentModified.value = (currentContent !== originalContent.value);
         })
     }
 
-    // 实现拉伸功能
+    // 实现ctrl+s保存
+    handleKeyDown = (e) => {
+        if(e.ctrlKey && e.key === 's'){
+            e.preventDefault();
+            if(currentFilePath.value && isContentModified.value){
+                saveFile();
+            }
+        }
+    }
 
+    document.addEventListener('keydown', handleKeyDown);
+
+    // 实现拉伸功能
     const resizer = document.querySelector('.resizer');
     const resultBar = document.querySelector('.app-result');
     const appMain = document.querySelector('.app-main');
@@ -481,6 +585,8 @@ onUnmounted(() => {
         editor.dispose();
         editor = null;
     }
+
+    document.removeEventListener('keydown', handleKeyDown);
 })
 </script>
 
@@ -588,6 +694,12 @@ onUnmounted(() => {
     padding: 8px;
     background-color: #f0f0f0;
     border-radius: 5px;
+}
+
+.downloadProject{
+    margin-left: auto;
+    background: none;
+    border: none;
 }
 
 .folder-toggle{
@@ -741,6 +853,19 @@ onUnmounted(() => {
     border-radius: 5px;
     overflow: hidden;
     height: calc(100vh - 200px);
+}
+
+.editor-placeholder{
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #888;
+}
+
+.editor-container.disabled{
+    opacity: 0.5;
+    pointer-events: none;
 }
 
 /* 终端栏 */

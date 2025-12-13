@@ -133,6 +133,7 @@ def get_project_tree():
         "status": "success"
     })
 
+# 下载项目
 @project_bp.route('/project/download', methods=['POST'])
 def download_file():
     try:
@@ -180,3 +181,79 @@ def download_file():
             "message": "Download failed:" + str(e),
             "status": "error"
         }), 400    
+
+
+# 加载代码文件
+@project_bp.route('/project/load_file', methods=['POST'])
+def get_file_content():
+    try:
+        data = request.get_json()
+        project_name = data.get('projectName')
+        file_path = data.get('filePath')
+        
+        if not project_name or not file_path:
+            return jsonify({
+                "message": "projectName and filePath are required",
+                "status": "error"
+            }), 400
+        
+        project_dir = os.path.join(PROJECTS_ROOT, project_name)
+        target_path = os.path.join(project_dir, file_path)
+
+        if not os.path.exists(target_path):
+            return jsonify({
+                "message": "file does not exist",
+                "status": "error"
+            }), 404
+        
+        with open(target_path, 'r', encoding='utf-8') as file:
+            content = file.read()
+
+        return jsonify({
+            "content": content,
+            "status": "success"
+        })
+    except UnicodeDecodeError:
+        return jsonify({
+            "message": "file is not utf-8 encoded",
+            "status": "error"
+        }), 400
+    except Exception as e:
+        return jsonify({
+            "message": "Failed to read file: " + str(e),
+            "status": "error"
+        }), 500
+    
+# 保存代码文件
+@project_bp.route('/project/save_file', methods=['POST'])
+def save_file():
+    try:
+        data = request.get_json()
+        project_name = data.get('projectName')
+        file_path = data.get('filePath')
+        content = data.get('content')
+
+        if not project_name or not file_path:
+            return jsonify({
+                "message": "projectName and filePath are required",
+                "status": "error"
+            }), 400
+        
+        project_dir = os.path.join(PROJECTS_ROOT, project_name)
+        target_path = os.path.join(project_dir, file_path)
+        target_dir = os.path.dirname(target_path)
+        if not os.path.exists(target_dir):
+            os.makedirs(target_dir)
+
+        with open(target_path, 'w', encoding='utf-8') as file:
+            file.write(content)
+
+        return jsonify({
+            "message": "file saved successfully",
+            "status": "success"
+        })
+    except Exception as e:
+        return jsonify({
+            "message": "Failed to save file: " + str(e),
+            "status": "error"
+        }), 500
