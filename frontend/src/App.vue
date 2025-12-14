@@ -161,7 +161,7 @@ const TreeNode = {
                 // 检查文件类型
                 const fileName = this.node.name.toLowerCase();
                 if(!fileName.endsWith('.py') && !fileName.endsWith('.txt')){
-                    alert('Editing this type of file is not supported');
+                    showNotification('Editing this type of file is not supported', 'warning');
                     return;
                 }
 
@@ -218,11 +218,11 @@ const TreeNode = {
                     window.URL.revokeObjectURL(url);
                 }else{
                     const error = await response.json();
-                    alert("Download Failed:" + error.message);
+                    showNotification("Failed to download:" + error.message, 'error');
                 }
             }catch(error){
-                console.error('Download Failed:', error);
-                alert('Download Failed:');
+                console.error('Failed to download:', error);
+                 showNotification("Failed to download:" + error.message, 'error');
             }
         },
         buildPath(node){    // 构建文件路径
@@ -261,14 +261,14 @@ const TreeNode = {
                             editor.updateOptions({readOnly: false});
                         }
                     }else{
-                        alert('Failed to load file' + result.message);
+                        showNotification('Failed to load file' + result.messagem , 'error');
                     }
                 }else{
-                    alert('Failed to load file: ' + response.json());
+                    showNotification('Failed to load file: ' + response.json(), 'error');
                 }
             }catch(error){
-                console.error('Error loading file:', error);
-                alert('Error loading file');
+                console.error('Failed to load file:', error);
+                showNotification("Failed to load file:" + error.message, 'error');
             }
         }
     }
@@ -308,11 +308,6 @@ const selectFolder = async() => {
 
         input.onchange = async(event) => {
             const files = event.target.files;
-            
-            if(files.length === 0){
-                alert('Selected floder is empty');
-                return;
-            }
 
             // 获取文件夹名称
             const firstFile = files[0];
@@ -323,8 +318,8 @@ const selectFolder = async() => {
 
         input.click();
     }catch(error){
-        console.error('Error selecting folder:', error);
-        alert('Folder selection failed');
+        console.error('Failed to select folder:', error);
+        showNotification('Failed to select folder', 'error');
     }
 }
 
@@ -348,11 +343,11 @@ const uploadFiles = async(projectName, files) => {
         if(result.status === 'success'){
             await loadProjectTree(projectName);
         }else{
-            alert('Error uploading files: ' + result.message);
+            showNotification('Failed to upload files', 'error');
         }
     }catch(error){
-        console.error('Error uploading files:', error);
-        alert('Error uploading files');
+        console.error('Failed to upload files:', error);
+        showNotification('Failed to upload files', 'error');
     }
 }
 
@@ -377,13 +372,13 @@ const saveFile = async() => {
         if(result.status === 'success'){
             originalContent.value = currentContent;
             isContentModified.value = false;
-            alert('file saved successfully');
+            showNotification('File saved successfully', 'success');
         }else{
-            alert('failed to save file' + result.message);
+            showNotification('Failed to save file', 'error');
         }
     }catch(error){
         console.error('Error saving file:', error);
-        alert('Error saving file');
+        showNotification('Failed to save file', 'error');
     }
 }
 
@@ -402,11 +397,11 @@ const setProject = async(path) => {
         if(result.status === 'success'){
             project.value = result.path;
         }else{
-            alert('Error adding project');
+            showNotification('Failed to add project', 'error');
         }
     }catch(error){
         console.error('Error adding project:', error);
-        alert('Error adding project');
+        showNotification('Failed to add project', 'error');
     }
 }
 
@@ -428,11 +423,11 @@ const loadProjectTree = async(projectName) => {
                 editor.updateOptions({readOnly: true});
             }
         }else{
-            alert('Failed to load project tree' + result.message);
+            showNotification('Failed to load project', 'error');
         }
     }catch(error){
         console.error('Error loading project Tree:', error);
-        alert('Failed to load project tree');
+        showNotification('Failed to load project', 'error');
     }
 }
 
@@ -447,7 +442,7 @@ const loadCurrentProject = async() => {
         }
     }catch(error){
         console.error('Error loading project:', error);
-        alert('Error loading project');
+        showNotification('Failed to load project', 'error');
     }
 }
 
@@ -478,16 +473,55 @@ const downloadProject = async() => {
             window.URL.revokeObjectURL(url);
         }else{
             const error = await response.json();
-            alert("Download Failed:" + error.message);
+            showNotification('Failed to download', 'error');
         }
     }catch(error){
         console.error('Download Failed:', error);
-        alert('Download Failed:');
+        showNotification('Failed to download', 'error');
     }
 }
 
-const showInfo = (info) => {
-    alert(info + ' button clicked');
+// ---通用函数---
+// 消息弹窗功能
+const showNotification = (message, type) => {
+    const notification = document.createElement('div');
+    notification.textContent = message;
+
+    notification.style.position = 'fixed';
+    notification.style.left = '50%';
+    notification.style.top = '20px';
+    notification.style.borderRadius = '5px';
+    notification.style.color = 'white';
+    notification.style.zIndex = '9999';
+    notification.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.2)'
+    notification.style.transition = 'all 0.3s ease'
+    notification.style.opacity = '0'
+    notification.style.transform = 'translateX(-50%)'
+    notification.style.fontSize = '20px'
+
+    if(type === 'success'){
+        notification.style.backgroundColor = '#4CAF50'
+    }else if(type === 'warning'){
+        notification.style.backgroundColor = '#FFC107'
+    }else{
+        notification.style.backgroundColor = '#F44336'
+    }
+    
+
+    document.body.appendChild(notification);
+
+    setTimeout(() =>{
+        notification.style.opacity = '1';
+        notification.style.transform = 'translateY(0)';
+    }, 10);
+
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transform = 'translateY(20px)';
+        setTimeout(() => {
+            document.body.removeChild(notification);
+        }, 300);
+    }, 2000);
 }
 
 // ---网页初始化---

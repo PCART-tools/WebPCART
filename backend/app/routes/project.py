@@ -35,6 +35,17 @@ def set_project():
     
     project = path
     project_dir = os.path.join(PROJECTS_ROOT, path)
+
+    # 清空原项目
+    if os.path.exists(PROJECTS_ROOT):
+        for item in os.listdir(PROJECTS_ROOT):
+            item_path = os.path.join(PROJECTS_ROOT, item)
+            if os.path.isfile(item_path):
+                os.remove(item_path)
+            elif os.path.isdir(item_path):
+                import shutil
+                shutil.rmtree(item_path)
+
     if not os.path.exists(project_dir):
         os.makedirs(project_dir)
 
