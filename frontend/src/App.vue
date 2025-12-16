@@ -18,25 +18,54 @@
 
         <!-- 网页主体 -->
         <div class="app-main">
-            <!-- 项目管理栏 -->
+            <!-- 项目管理栏（含运行结果） -->
             <div class="app-project">
-                <div class="project-title">
-                    <b>Projects</b>
-                    <button @click="selectFolder" title="import" class="import-button">
-                        <i class="fas fa-plus"></i>
-                    </button>
+                <div class="project-nav">
+                    <button
+                        class="nav-button"
+                        :class="{active: projectView === 'project'}"
+                        @click="projectView = 'project'"
+                    >Project</button>
+                    <button
+                        class="nav-button"
+                        :class="{active: projectView === 'intermediate'}"
+                        @click="projectView = 'intermediate'"
+                    >Intermediate</button>
+                    <button
+                        class="nav-button"
+                        :class="{active: projectView === 'fixresult'}"
+                        @click="projectView = 'fixresult'"
+                    >FixResult</button>
                 </div>
-                <div v-if="project" class="current-project">
-                    <div class="project-header">
-                        <span class="project-path">{{project}}</span>
-                        <button class="downloadProject" title="Download Project" @click="downloadProject">
-                            <i class="fas fa-download"></i>
+
+                <div v-show="projectView === 'project'" class="project-content">
+                    <div class="project-title">
+                        <b>Projects</b>
+                        <button @click="selectFolder" title="import" class="import-button">
+                            <i class="fas fa-plus"></i>
                         </button>
                     </div>
-                    <div v-if="fileTree" class="file-tree">
-                        <tree-view :tree-data="fileTree" :project-name="project"/>
-                    </div>
+                    <div v-if="project" class="current-project">
+                        <div class="project-header">
+                            <span class="project-path">{{project}}</span>
+                            <button class="downloadProject" title="Download Project" @click="downloadProject">
+                                <i class="fas fa-download"></i>
+                            </button>
+                        </div>
+                        <div v-if="fileTree" class="file-tree">
+                            <tree-view :tree-data="fileTree" :project-name="project"/>
+                        </div>
+                    </div>  
                 </div>
+
+                <div v-show="projectView === 'intermediate'" class="intermediate-content">
+                    <b>Run fix command to get results</b>
+                </div>
+
+                <div v-show="projectView === 'fixresult'" class="result-content">
+                    <b>Run fix command to get results</b>
+                </div>
+                
             </div>
 
             <div class="app-middle">
@@ -63,41 +92,32 @@
                     </div>
                 </div>
 
+                <!-- 运行命令栏 -->
+                <div class="app-command"> 
+                    <div class="command-container">
+                        <input 
+                            type="text"
+                            class="command-input"
+                            placeholder="Please enter the project run command"
+                            v-model="runCommand"
+                        />
+                    </div>   
+                </div>
+
                 <!-- 代码编辑栏 -->
                 <div class="app-code">
-                    <div class="editor-container" ref="editorRef" :class="{disabled: !currentFilePath}"></div>
+                    <div class="editor-container" ref="editorRef" :class="{disabled: !currentFilePath}" v-show="currentFilePath"></div>
                     <div v-if="!currentFilePath" class="editor-placeholder">
-                        choose a file(.py / .txt) to edit
+                        <b>choose a file(.py / .txt) to edit</b>
                     </div>
                 </div>
             </div>
 
-            <!-- 运行结果栏 -->
+            <!-- 终端栏 -->
             <div class="app-wrapper">
                 <div class="resizer"></div>
-                <div class="app-result">
-                    <div class="result-tabs">
-                        <button class="result-button"
-                        :class="{'active':activeTab === 'terminal'}"
-                        @click="activeTab = 'terminal'">
-                            terminal
-                        </button>
-                        <button class="result-button"
-                        :class="{'active':activeTab === 'intermediate'}"
-                        @click="activeTab = 'intermediate'">
-                            intermediate
-                        </button>
-                        <button class="result-button"
-                        :class="{'active':activeTab === 'fixResult'}"
-                        @click="activeTab = 'fixResult'">
-                            fixResult
-                        </button>
-                    </div>
-                    <div class="result-content"> 
-                        <div v-if="activeTab === 'terminal'">terminal page</div>
-                        <div v-if="activeTab === 'intermediate'">intermediate page</div>
-                        <div v-if="activeTab === 'fixResult'">fixResult page</div>
-                    </div>
+                <div class="app-terminal">
+                    <b>Terminal</b>
                 </div>
             </div>
         </div>
@@ -525,16 +545,17 @@ const showNotification = (message, type) => {
 }
 
 // ---网页初始化---
-const activeTab = ref('terminal')
+const projectView = ref('project')
 const editorRef = ref(null)
 let editor = null
 let handleKeyDown = null
+const runCommand = ref('')
 
 onMounted(() => { 
     // 创建编辑器实例
     if(editorRef.value){
         editor = monaco.editor.create(editorRef.value, {
-            value: ' ',
+            value: '',
             language: 'python',
             scrollBeyondLastLine: false,
             fontSize: 14,
@@ -569,17 +590,17 @@ onMounted(() => {
 
     // 实现拉伸功能
     const resizer = document.querySelector('.resizer');
-    const resultBar = document.querySelector('.app-result');
+    const terminalBar = document.querySelector('.app-terminal');
     const appMain = document.querySelector('.app-main');
     const appMiddle = document.querySelector('.app-middle');
 
     const validWidth = appMain.offsetWidth - document.querySelector('.app-project').offsetWidth;
-    let startX, startMiddleWidth, startResultWidth;
+    let startX, startMiddleWidth, startTerminalWidth;
 
     const mouseDownHandler = function(e){
         startX = e.clientX;
         startMiddleWidth = appMiddle.offsetWidth;
-        startResultWidth = resultBar.offsetWidth;
+        startTerminalWidth = terminalBar.offsetWidth;
 
         document.addEventListener('mousemove', mouseMoveHandler)
         document.addEventListener('mouseup', mouseUpHandler)
@@ -590,11 +611,11 @@ onMounted(() => {
 
     const mouseMoveHandler = function(e){ 
         const deltaX = e.clientX - startX;
-        const newResultBarWidth = startResultWidth - deltaX;
+        const newTerminalBarWidth = startTerminalWidth - deltaX;
         const newMiddleWidth = startMiddleWidth + deltaX;
 
-        if(newResultBarWidth > 150 && newMiddleWidth > 600){
-            resultBar.style.width = `${newResultBarWidth}px`;
+        if(newTerminalBarWidth > 150 && newMiddleWidth > 600){
+            terminalBar.style.width = `${newTerminalBarWidth}px`;
             appMiddle.style.width = `${newMiddleWidth}px`;
             if(editor){
                 editor.layout();
@@ -641,7 +662,7 @@ onUnmounted(() => {
     display: flex;
     flex-direction: column;
     padding-top: 60px;
-    overflow-x: hidden;
+    overflow: hidden;
 }
 
 /* 功能栏 */
@@ -673,7 +694,7 @@ onUnmounted(() => {
 
 .app-main{
     display: flex;
-    min-height: 100vh;
+    min-height: calc(100vh - 60px);
     width: 100%;
 
 }
@@ -697,10 +718,44 @@ onUnmounted(() => {
 
 /* 项目管理栏 */
 .app-project{
-    width: 240px;
+    width: 270px;
     border-right: 1px solid #e0e0e0;
     padding: 10px;
     position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.project-nav{
+    display: flex;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #e0e0e0;
+    gap: 3px;
+}
+
+.nav-button{
+    flex: 1;
+    padding: 8px 0;
+    background: #f0f0f0;
+    cursor: pointer;
+    font-size: 15px;
+    border: 2px solid #474545ff;
+    border-radius: 5px;
+}
+
+.nav-button.active{
+    background: #fff;
+    border-bottom: 2px solid #22fc00ff;
+    font-weight: bold;
+}
+
+.project-content{
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    height: 100%;
 }
 
 .project-title{ 
@@ -719,6 +774,10 @@ onUnmounted(() => {
 
 .current-project{
     margin-top: 15px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
 }
 
 .project-header{
@@ -753,25 +812,38 @@ onUnmounted(() => {
 
 .file-tree{
     margin-top: 15px;
-    font-size: 14px;
+    font-size: 8px;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: auto;
 }
 
 .tree ul{
     list-style-type: none;
     padding-left: 20px;
+    min-width: 100%;
+    display: block;
 }
 
 .tree-node{
     display: flex;
     align-items: center;
     gap: 5px;
-    padding: 3px 0;
+    padding: 1px 0;
+    width: fit-content;
+    min-width: 100%;
     cursor: pointer;
     user-select: none;
 }
 
 .tree-node:hover{
     background-color: #d2e0e7;
+}
+
+.tree-node span{
+    white-space: nowrap;
+    flex: 1;
+    min-width: 10px;
 }
 
 .download-button{
@@ -782,6 +854,7 @@ onUnmounted(() => {
     opacity: 0;
     transition: opacity 0.2s;
     padding: 2px 5px;
+    flex-shrink: 0;
 }
 
 .tree-node:hover .download-button{
@@ -846,6 +919,36 @@ onUnmounted(() => {
     background: #50f9ffff;
  }
 
+ /* 运行命令栏 */
+ .app-command{
+    height: 60px;
+    padding: 10px;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+ }
+
+ .command-container{
+    width: 100%
+ }
+
+ .command-input{ 
+    width: 100%;
+    padding: 10px 15px;
+    border: 1px solid #ccc;
+    font-size: 16px;
+    outline: none;
+ }
+
+ .command-input:focus{
+    border-color: #50f9ffff;
+    box-shadow: 0 0 2px rgba(80, 249, 255, 0.2);
+ }
+
+ .command-input::placeholder{
+    color: #999;
+ }
+
  /* 项目目标配置栏 */
 .app-target{
     flex: 1;
@@ -879,6 +982,7 @@ onUnmounted(() => {
     padding: 10px;
     display: flex;
     flex-direction: column;
+    position: relative;
 }
 
 .editor-container{
@@ -886,7 +990,7 @@ onUnmounted(() => {
     border: 1px solid #e0e0e0;
     border-radius: 5px;
     overflow: hidden;
-    height: calc(100vh - 200px);
+    height: 100%;
 }
 
 .editor-placeholder{
@@ -903,37 +1007,10 @@ onUnmounted(() => {
 }
 
 /* 终端栏 */
-.app-result{
+.app-terminal{
     width: 300px;
     position: relative;
     flex: 1;
     overflow: auto;
 }
-
-.result-tabs{
-    display: flex;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-.result-button{
-    flex: 1;
-    padding: 10px 0;
-    border: none;
-    border-right: 2px solid #474545ff;
-    background: #f5f5f5;
-    cursor: pointer;
-    transition: all 0.3s;
-}
-
-.result-button.active{
-    background: #fff;
-    border-bottom: 2px solid #22fc00ff;
-    font-weight: bold;
-}
-
-.result-content{
-    flex: 1;
-    padding: 10px;
-    overflow: auto;
- }
 </style>
