@@ -45,7 +45,15 @@
                             <i class="fas fa-plus"></i>
                         </button>
                     </div>
-                    <div v-if="project" class="current-project">
+                    <div v-if="isUploading" class="upload-progress-container">
+                        <div class="progress-bar-background">
+                            <div class="progress-bar-fill"
+                                :style="{width: uploadProgress + '%'}"
+                            ></div>
+                        </div>
+                        <div class="progress-percentage">{{ uploadProgress }} %</div>
+                    </div>
+                    <div v-if="!isUploading && project" class="current-project">
                         <div class="project-header">
                             <span class="project-path">{{project}}</span>
                             <button class="downloadProject" title="Download Project" @click="downloadProject">
@@ -178,9 +186,14 @@ const TreeNode = {
         },
         handleNodeClick(){  // 处理文件点击
             if(this.node.type === 'file'){
+                // 允许的文件类型
+                const allowedExtensions = ['.py', '.txt', 'md']
+
                 // 检查文件类型
                 const fileName = this.node.name.toLowerCase();
-                if(!fileName.endsWith('.py') && !fileName.endsWith('.txt')){
+                const isAllowed = allowedExtensions.some(ext => fileName.endsWith(ext))
+
+                if(!isAllowed){
                     showNotification('Editing this type of file is not supported', 'warning');
                     return;
                 }
@@ -316,10 +329,21 @@ const TreeView = {
 
 const project = ref(null)
 const fileTree = ref(null)
+const uploadProgress = ref(0)
+const isUploading = ref(false)
+const totalBatches = ref(0)
+const currentBatch = ref(0)
 
 // 选择文件夹
 const selectFolder = async() => {
     try{
+        if(project.value){
+            const shouldContinue = confirm('The current project will be lost. Are you sure you want to import a new project?');
+            if(!shouldContinue){
+                return;
+            }
+        }
+
         const input = document.createElement('input');
         input.type = 'file';
         input.webkitdirectory = true;
@@ -345,29 +369,70 @@ const selectFolder = async() => {
 
 // 上传本地文件到后端
 const uploadFiles = async(projectName, files) => { 
+    isUploading.value = true;
+    uploadProgress.value = 0;
+
+    const BATCH_SIZE = 50; // 每批次上传文件数
     try{
-        const formData = new FormData();
-        formData.append('projectName', projectName);
+        const batches = [];
+        totalBatches.value = Math.ceil(files.length / BATCH_SIZE);
+        currentBatch.value = 0;
 
-        for(let i = 0; i < files.length; i++){
-            formData.append('files', files[i]);
-            formData.append(`paths[${i}]`, files[i].webkitRelativePath || files[i].name);
+        // 重置代码编辑器
+        currentFilePath.value = null;
+        originalContent.value = '';
+        if(editor){
+            editor.setValue('');
+            editor.updateOptions({readOnly: true});
         }
 
-        const response = await fetch('http://localhost:5000/project/upload', {
-            method: 'POST',
-            body: formData
-        });
-
-        const result = await response.json();
-        if(result.status === 'success'){
-            await loadProjectTree(projectName);
-        }else{
-            showNotification('Failed to upload files', 'error');
+        // 分割文件
+        for(let i = 0; i < files.length; i += BATCH_SIZE){
+            batches.push(Array.from(files).slice(i, i + BATCH_SIZE))
         }
+
+        // 分批上传文件
+        for(let batchIndex = 0; batchIndex < batches.length; batchIndex++){
+            const formData = new FormData();
+            const batch = batches[batchIndex];
+            
+            formData.append('projectName', projectName);
+            formData.append('batchIndex', batchIndex);
+            
+            for(let i = 0; i < batch.length; i++){
+                formData.append('files', batch[i]);
+                const relativePath = batch[i].webkitRelativePath || batch[i].name;
+                formData.append(`paths[${i}]`, relativePath);
+            }
+
+            const response = await fetch('http://localhost:5000/project/upload_batch', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+            if(result.status === 'success'){
+                currentBatch.value = batchIndex + 1;
+                uploadProgress.value = Math.round(((batchIndex + 1) / batches.length) * 100);
+            }else{
+                throw new Error('Failed to upload files: ' + result.message);
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 100))
+        }
+
+        showNotification(`${files.length} files Uploaded completed`, 'success');
+        await loadProjectTree(projectName);
     }catch(error){
         console.error('Failed to upload files:', error);
         showNotification('Failed to upload files', 'error');
+    }finally{
+        setTimeout(() => {
+            isUploading.value = false;
+            uploadProgress.value = 0;
+            totalBatches.value = 0;
+            currentBatch.value = 0;
+        }, 500)
     }
 }
 
@@ -468,6 +533,14 @@ const loadCurrentProject = async() => {
 
 const downloadProject = async() => {
     try{
+        // 检查是否有未保存的修改
+        if(isContentModified.value && currentFilePath.value){
+            const save = confirm('There are unsaved changes. Do you want to save them before downloading?');
+            if(save){
+                await saveFile();
+            }
+        }
+
         const response = await fetch(`http://localhost:5000/project/download`, {
             method: 'POST',
             headers:{
@@ -750,6 +823,7 @@ onUnmounted(() => {
     font-weight: bold;
 }
 
+/* 项目页 */
 .project-content{
     flex: 1;
     display: flex;
@@ -762,6 +836,34 @@ onUnmounted(() => {
     display: flex;
     justify-content: space-between;
     align-items: center;
+}
+
+.upload-progress-container{
+    margin-top: 15px;
+    padding: 10px;
+    background-color: #e3f2fd;
+    border-radius: 5px;
+    border: 1px solid #e0e0e0;
+}
+
+.progress-bar-background{
+    width: 100%;
+    height: 12px;
+    background-color: #e0e0e0;
+    border-radius: 5px;
+    overflow: hidden;
+    margin-bottom: 5px;
+}
+
+.progress-bar-fill{
+    height: 100%;
+    background: linear-gradient(to right, #4CAF50, #8BC34A);
+}
+
+.progress-percentage{
+    font-size: 12px;
+    text-align: center;
+    color: #666;
 }
 
 .project-title .import-button{

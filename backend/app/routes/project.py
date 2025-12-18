@@ -55,16 +55,19 @@ def set_project():
         "path": project
     })
 
-@project_bp.route('/project/upload', methods=['POST'])
-def upload_file():
+# 分批上传文件
+@project_bp.route('/project/upload_batch', methods=['POST'])
+def upload_batch():
     try:
         project_name = request.form.get('projectName')
+        batch_index = int(request.form.get('batchIndex', 0))
         files = request.files.getlist('files')
 
         project_dir = os.path.join(PROJECTS_ROOT, project_name)
         if not os.path.exists(project_dir):
             os.makedirs(project_dir)
 
+        upload_count = 0
         for i, file in enumerate(files):
             if file and file.filename:
                 relative_path = request.form.get(f'paths[{i}]')
@@ -76,18 +79,22 @@ def upload_file():
                     file_dir = os.path.join(project_dir, os.path.dirname(relative_path))
                     if not os.path.exists(file_dir):
                         os.makedirs(file_dir)
-                    
+
                     file_path = os.path.join(project_dir, relative_path)
                     file.save(file_path)
+                    upload_count += 1
                 else:
                     file_path = os.path.join(project_dir, file.filename)
                     file.save(file_path)
+                    upload_count += 1
 
         return jsonify({
-            "message": f"{len(files)} Files uploaded successfully",
-            "status": "success"
+            "message": f"Batch {batch_index + 1} uploaded successfully",
+            "status": "success",
+            "uploadedCount": upload_count,
+            "batchIndex": batch_index,
         })
-    
+
     except Exception as e:
         return jsonify({
             "message": f"upload failed {str(e)}",
