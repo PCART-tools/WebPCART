@@ -170,6 +170,16 @@
                 </div>
             </div>
 
+            <div v-if="isCreatingEnv" class="progress-section">
+                <div class="progress-label">{{creatingEnvStep}}</div>
+                <div class="progress-bar-background">
+                    <div class="progress-bar-fill"
+                     :style="{width: envCreationProgress + '%'}"></div>
+                </div>
+            </div>
+
+            <div v-if="envCreationError" class="error-message">{{envCreationError}}</div>
+
             <div class="modal-footer">
                 <button @click="closeImportEnvModal" class="cancel-button">Cancel</button>
                 <button
@@ -658,9 +668,12 @@ const downloadProject = async() => {
 const showImportModal = ref(false)
 const importEnvMethod = ref('requirements')
 const selectedEnvType = ref(null)
-const pythonVersion = ref('python3.9')
+const pythonVersion = ref('python3.12')
 const requirementFile = ref(null)
 const isCreatingEnv = ref(false)
+const creatingEnvStep = ref('Initializing')
+const envCreationProgress = ref(0)
+const envCreationError = ref('')
 
 const currentEnv = ref({
     pythonVersion: '',
@@ -709,6 +722,10 @@ const createEnvironment = async() => {
         }
 
         isCreatingEnv.value = true;
+        envCreationError.value = '';
+        envCreationProgress.value = 0;
+        creatingEnvStep.value = 'Creating virtual environment'
+
         try{
             const formData = new FormData();
             formData.append('importEnvMethod', 'requirements');
@@ -721,31 +738,65 @@ const createEnvironment = async() => {
                 body: formData
             })
 
-            const result = await response.json();
-            if(result.status === 'success'){
-                if(selectedEnvType.value === 'current'){
-                    currentEnv.value = {
-                        pythonVersion: pythonVersion.value,
-                        dependencies: result.dependencies || [],
-                        path: result.path
-                    };
-                }else{
-                    targetEnv.value = {
-                        pythonVersion: pythonVersion.value,
-                        dependencies: result.dependencies || [],
-                        path: result.path
-                    };
-                }
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
 
-                showNotification(`${selectedEnvType.value} environment created successfully`, 'success');
-                closeImportEnvModal();
-            }else{
-                showNotification(`Failed to create ${selectedEnvType.value} environment: `, 'error');
+            // 持续获取创建进度
+            while(true){
+                const {done, value} = await reader.read();
+                if(done) break;
+
+                const chunk = decoder.decode(value, {stream: true});
+                const lines = chunk.split('\n');
+
+                for(const line of lines){
+                    if(line.startsWith('data: ')){
+                        try{
+                            const data = JSON.parse(line.substring(6));
+
+                            if(data.status === 'progress'){
+                                creatingEnvStep.value = data.step;
+                                envCreationProgress.value = data.progress;
+                            }else if(data.status === 'error'){
+                                envCreationError.value = data.message.replace(/\u001b\[[0-9;]*m/g, '');  // 去除ANSI控制字符
+                                isCreatingEnv.value = false;
+                                return;
+                            }else if(data.status === 'success'){
+                                envCreationProgress.value = 100;
+                                creatingEnvStep.value = 'Environment created successfully';
+
+                                if(selectedEnvType.value === 'current'){
+                                    currentEnv.value = {
+                                        pythonVersion: pythonVersion.value,
+                                        dependencies: data.dependencies || [],
+                                        path: data.path
+                                    };
+                                }else{
+                                    targetEnv.value = {
+                                        pythonVersion: pythonVersion.value,
+                                        dependencies: data.dependencies || [],
+                                        path: data.path
+                                    };
+                                }
+
+                                setTimeout(() => {
+                                    showNotification(`${selectedEnvType.value} environment created successfully`, 'success')
+                                    closeImportEnvModal();
+                                }, 1000);
+
+                                isCreatingEnv.value = false;
+                                return;
+                            }
+                        }catch(e){
+                            console.error('Error parsing JSON:', e);
+                        }
+                    }
+                }
             }
         }catch(error){
+            envCreationError.value = error.message
             console.error('Error creating environment:', error);
             showNotification(`Failed to create ${selectedEnvType.value} environment: `, 'error');
-        }finally{
             isCreatingEnv.value = false;
         }
     }
@@ -768,6 +819,9 @@ const openEnvDetailsModal = (envType) =>{
 const closeEnvDetailsModal = () => {
     showEnvDetailsModal.value = false;
     selectedEnvDetailsType.value = '';
+    envCreationProgress.value = 0;
+    envCreationError.value = '';
+    creatingEnvStep.value = 'Initializing';
 }
 
 // ---通用函数---
@@ -1049,6 +1103,8 @@ onUnmounted(() => {
     border-radius: 5px;
     overflow: hidden;
     margin-bottom: 5px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .progress-bar-fill{
@@ -1421,12 +1477,35 @@ onUnmounted(() => {
     color: #666;
 }
 
+.progress-section{
+    margin-top: 20px;
+    padding: 0 20px;
+}
+
+.progress.label{
+    margin-bottom: 8px;
+    font-weight: bold;
+}
+
 .env-detail-value{
     padding: 10px;
     background-color: #f5f5f5;
     border-radius: 5px;
     border: 1px solid #ddd;
     min-height: 20px;
+}
+
+.error-message{
+    margin-top: 15px;
+    padding: 10px;
+    background-color: #f5f5f5;
+    border: 1px solid #f44336;
+    border-radius: 5px;
+    color: #f44336;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 150px;
+    overflow-y: auto;
 }
 
 .dependencies-list{
