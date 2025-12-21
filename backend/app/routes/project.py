@@ -6,7 +6,7 @@ from io import BytesIO
 
 project_bp = Blueprint('project', __name__)
 
-PROJECTS_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'projects')
+PROJECTS_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'projects')
 project = None
 
 if not os.path.exists(PROJECTS_ROOT):
@@ -20,7 +20,7 @@ def get_projects():
         "status": "success"
     })
 
-# 添加新项目
+# 添加新项目(获取该项目在后端存放的路径)
 @project_bp.route('/project', methods=['POST'])
 def set_project():
     global project
