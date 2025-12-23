@@ -1,0 +1,37 @@
+/* 代码编辑栏 */
+.app-code{
+    flex: 1;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.editor-container{
+    flex: 1;
+    border: 1px solid #e0e0e0;
+    border-radius: 5px;
+    overflow: hidden;
+    height: 100%;
+}
+
+.editor-placeholder{
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #888;
+}
+
+.editor-container.disabled{
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* 终端栏 */
+.app-terminal{
+    width: 300px;
+    position: relative;
+    flex: 1;
+    overflow: auto;
+}

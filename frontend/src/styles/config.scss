@@ -1,0 +1,112 @@
+/* 中心部分 */
+.app-middle{
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #e0e0e0;
+}
+
+/* 虚拟环境配置栏 */
+.app-config{
+    height: 130px;
+    padding: 10px;
+    border-bottom: 1px solid #e0e0e0;
+    position: relative;
+    display: flex;
+}
+
+.app-env{
+    flex: 3;
+    padding-right: 10px;
+    border-right: 1px solid #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: 10px;
+}
+
+.env-section{
+    flex: 1;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.env-display-button{
+    flex: 5;
+    padding: 10px 5px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    cursor: pointer;
+    background: #fff;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+ }
+
+ .env-add-button{
+    flex: 1;
+    padding: 10px 5px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    cursor: pointer;
+    background: #50f9ffff;
+ }
+
+ /* 运行命令栏 */
+ .app-command{
+    height: 60px;
+    padding: 10px;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+ }
+
+ .command-container{
+    width: 100%
+ }
+
+ .command-input{ 
+    width: 100%;
+    padding: 10px 15px;
+    border: 1px solid #ccc;
+    font-size: 16px;
+    outline: none;
+ }
+
+ .command-input:focus{
+    border-color: #50f9ffff;
+    box-shadow: 0 0 2px rgba(80, 249, 255, 0.2);
+ }
+
+ .command-input::placeholder{
+    color: #999;
+ }
+
+ /* 项目目标配置栏 */
+.app-target{
+    flex: 1;
+    padding: 0 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.target-select{
+    padding: 8px 5px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    width: 100%;
+}
+
+.run-button{ 
+    padding: 6px 5px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    cursor: pointer;
+    background: #22fc00ff;
+    color: white;
+    width: 30%;
+    margin: 0 auto;
+}

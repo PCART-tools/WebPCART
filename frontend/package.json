@@ -11,7 +11,6 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint . --fix --cache",
-
     "dev:front": "npm run dev",
     "dev:back": "cd ../backend && ./venv/bin/python run.py",
     "dev:all": "concurrently \"npm run dev:back\" \"npm run dev:front\""
@@ -29,6 +28,7 @@
     "eslint": "^9.39.1",
     "eslint-plugin-vue": "~10.5.1",
     "globals": "^16.5.0",
+    "sass-embedded": "^1.97.1",
     "vite": "^7.2.4",
     "vite-plugin-vue-devtools": "^8.0.5"
   }
