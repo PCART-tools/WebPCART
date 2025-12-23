@@ -226,649 +226,57 @@
 import {ref, onMounted, onUnmounted} from 'vue'
 import * as monaco from 'monaco-editor'
 
+// 导入拆分的模块
+import TreeView from './components/TreeView.vue'
+import { 
+    project, 
+    fileTree, 
+    uploadProgress, 
+    isUploading, 
+    totalBatches, 
+    currentBatch, 
+    currentFilePath, 
+    originalContent, 
+    isContentModified,
+    selectFolder,
+    uploadFiles,
+    saveFile,
+    setProject,
+    loadProjectTree,
+    loadCurrentProject,
+    downloadProject
+} from './composables/projectManager'
+
+import { 
+    showImportModal,
+    importEnvMethod,
+    selectedEnvType,
+    pythonVersion,
+    requirementFile,
+    isCreatingEnv,
+    creatingEnvStep,
+    envCreationProgress,
+    envCreationError,
+    currentEnv,
+    targetEnv,
+    showEnvDetailsModal,
+    envDetails,
+    selectedEnvDetailsType,
+    openImportEnvModal,
+    closeImportEnvModal,
+    handleRequirementSelect,
+    createEnvironment,
+    openEnvDetailsModal,
+    closeEnvDetailsModal
+} from './composables/envManager'
+
+import { showNotification } from './composables/utils'
+
 // ---项目栏功能---
-// 文件节点视图
-const currentFilePath = ref(null)
-const originalContent = ref('')
-const isContentModified = ref(false)
-
-const TreeNode = {
-    name: 'TreeNode',
-    props: ['node', 'projectName', 'basePath'],
-    template: ` 
-        <li>
-            <div class="tree-node" @click="handleNodeClick">
-                <i v-if="node.type === 'directory'"
-                    @click.stop="toggleDirectory"
-                    class="folder-toggle"
-                    :class="isExpanded ? 'fa fa-chevron-down' : 'fa fa-chevron-right'">
-                </i>
-                <i v-if="node.type === 'directory'"
-                    class= "fas fa-file folder-icon"
-                ></i>
-                <i v-else
-                    class= "fas fa-file file-icon"
-                ></i>
-                <span>{{node.name}}</span> 
-                <button @click.stop="downloadItem(node)" class="download-button" title="Download">
-                    <i class="fas fa-download"></i>
-                </button>
-            </div>
-            <ul v-if="node.type === 'directory' && node.children && node.children.length && isExpanded">
-                <tree-node 
-                    v-for="(child, index) in node.children"
-                    :key="index"
-                    :node="child"
-                    :project-name="projectName"
-                    :base-path="getCurrentPath()"
-                />
-            </ul>
-        </li>
-    `,
-    data(){
-        return{
-            isExpanded: false
-        }
-    },
-    methods:{
-        toggleDirectory(){  // 展开或折叠文件夹
-            this.isExpanded = !this.isExpanded;
-        },
-        handleNodeClick(){  // 处理文件点击
-            if(this.node.type === 'file'){
-                // 允许的文件类型
-                const allowedExtensions = ['.py', '.txt', 'md']
-
-                // 检查文件类型
-                const fileName = this.node.name.toLowerCase();
-                const isAllowed = allowedExtensions.some(ext => fileName.endsWith(ext))
-
-                if(!isAllowed){
-                    showNotification('Editing this type of file is not supported', 'warning');
-                    return;
-                }
-
-                // 检查是否需要保存上一份文件
-                if(isContentModified.value){
-                    const saveChanges = confirm('The current file has unsaved changes. Do you want to save them?');
-                    if(saveChanges){
-                        saveFile();
-                    }
-                }
-
-                this.loadFileContent();
-            }else if(this.node.type === 'directory'){
-                this.toggleDirectory();
-            }
-        },
-        getCurrentPath(){   // 获取当前节点路径
-            if(this.basePath){
-                return this.basePath + '/' + this.node.name;
-            }
-            return this.node.name;
-        },
-        async downloadItem(){   // 下载文件
-            try{
-                const fullPath = this.getCurrentPath();
-
-                const response = await fetch(`http://localhost:5000/project/download`, {
-                    method: 'POST',
-                    headers:{
-                        'Content-Type':'application/json'
-                    },
-                    body: JSON.stringify({
-                        projectName: this.projectName,
-                        path: fullPath,
-                        type: this.node.type
-                    })
-                });
-
-                if(response.ok){
-                    let filename = this.node.name;
-                    if(this.node.type !== 'file'){
-                        filename = `${this.node.name}.zip`;
-                    }
-
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-
-                    a.href = url;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                }else{
-                    const error = await response.json();
-                    showNotification("Failed to download:" + error.message, 'error');
-                }
-            }catch(error){
-                console.error('Failed to download:', error);
-                 showNotification("Failed to download:" + error.message, 'error');
-            }
-        },
-        buildPath(node){    // 构建文件路径
-            const paths = [];
-            let currentNode = node;
-
-            while(currentNode){
-                paths.unshift(currentNode.name);
-                break;
-            }
-
-            return node.name;
-        },
-        async loadFileContent(){    // 加载文件内容
-            try{
-                const fullPath = this.getCurrentPath();
-                const response = await fetch('http://localhost:5000/project/load_file', {
-                    method: 'POST',
-                    headers:{
-                        'Content-Type':'application/json'
-                    },
-                    body: JSON.stringify({
-                        projectName: this.projectName,
-                        filePath: fullPath
-                    })
-                });
-
-                if(response.ok){
-                    const result = await response.json();
-                    if(result.status === 'success'){
-                        currentFilePath.value = fullPath;
-                        originalContent.value = result.content;
-                        if(editor){
-                            editor.setValue(result.content);
-                            isContentModified.value = false;
-                            editor.updateOptions({readOnly: false});
-                        }
-                    }else{
-                        showNotification('Failed to load file' + result.messagem , 'error');
-                    }
-                }else{
-                    showNotification('Failed to load file: ' + response.json(), 'error');
-                }
-            }catch(error){
-                console.error('Failed to load file:', error);
-                showNotification("Failed to load file:" + error.message, 'error');
-            }
-        }
-    }
-}
-
-// 文件树视图
-const TreeView = {
-    name: 'TreeView',
-    props: ['treeData', 'projectName'],
-    components:{
-        TreeNode
-    },
-    template: `
-        <ul class="tree">
-            <tree-node 
-                v-for="(node, index) in treeData.children"
-                :key="index"
-                :node="node"
-                :project-name="projectName"
-                :base-path="''"
-            />
-        </ul>
-    `
-}
-
-const project = ref(null)
-const fileTree = ref(null)
-const uploadProgress = ref(0)
-const isUploading = ref(false)
-const totalBatches = ref(0)
-const currentBatch = ref(0)
-
-// 选择文件夹
-const selectFolder = async() => {
-    try{
-        if(project.value){
-            const shouldContinue = confirm('The current project will be lost. Are you sure you want to import a new project?');
-            if(!shouldContinue){
-                return;
-            }
-        }
-
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.webkitdirectory = true;
-        input.directory = true;
-        input.multiple = true;
-
-        input.onchange = async(event) => {
-            const files = event.target.files;
-
-            // 获取文件夹名称
-            const firstFile = files[0];
-            let folderName = firstFile.webkitRelativePath.split('/')[0];
-            await setProject(folderName);
-            await uploadFiles(folderName, files);
-        };
-
-        input.click();
-    }catch(error){
-        console.error('Failed to select folder:', error);
-        showNotification('Failed to select folder', 'error');
-    }
-}
-
-// 上传本地文件到后端
-const uploadFiles = async(projectName, files) => { 
-    isUploading.value = true;
-    uploadProgress.value = 0;
-
-    const BATCH_SIZE = 50; // 每批次上传文件数
-    try{
-        const batches = [];
-        totalBatches.value = Math.ceil(files.length / BATCH_SIZE);
-        currentBatch.value = 0;
-
-        // 重置代码编辑器
-        currentFilePath.value = null;
-        originalContent.value = '';
-        if(editor){
-            editor.setValue('');
-            editor.updateOptions({readOnly: true});
-        }
-
-        // 分割文件
-        for(let i = 0; i < files.length; i += BATCH_SIZE){
-            batches.push(Array.from(files).slice(i, i + BATCH_SIZE))
-        }
-
-        // 分批上传文件
-        for(let batchIndex = 0; batchIndex < batches.length; batchIndex++){
-            const formData = new FormData();
-            const batch = batches[batchIndex];
-            
-            formData.append('projectName', projectName);
-            formData.append('batchIndex', batchIndex);
-            
-            for(let i = 0; i < batch.length; i++){
-                formData.append('files', batch[i]);
-                const relativePath = batch[i].webkitRelativePath || batch[i].name;
-                formData.append(`paths[${i}]`, relativePath);
-            }
-
-            const response = await fetch('http://localhost:5000/project/upload_batch', {
-                method: 'POST',
-                body: formData
-            });
-
-            const result = await response.json();
-            if(result.status === 'success'){
-                currentBatch.value = batchIndex + 1;
-                uploadProgress.value = Math.round(((batchIndex + 1) / batches.length) * 100);
-            }else{
-                throw new Error('Failed to upload files: ' + result.message);
-            }
-
-            await new Promise(resolve => setTimeout(resolve, 100))
-        }
-
-        showNotification(`${files.length} files Uploaded completed`, 'success');
-        await loadProjectTree(projectName);
-    }catch(error){
-        console.error('Failed to upload files:', error);
-        showNotification('Failed to upload files', 'error');
-    }finally{
-        setTimeout(() => {
-            isUploading.value = false;
-            uploadProgress.value = 0;
-            totalBatches.value = 0;
-            currentBatch.value = 0;
-        }, 500)
-    }
-}
-
-// 保存已修改文件
-const saveFile = async() => {
-    try{
-        const currentContent = editor.getValue();
-
-        const response = await fetch('http://localhost:5000/project/save_file', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                projectName: project.value,
-                filePath: currentFilePath.value,
-                content: currentContent
-            })
-        });
-
-        const result = await response.json();
-        if(result.status === 'success'){
-            originalContent.value = currentContent;
-            isContentModified.value = false;
-            showNotification('File saved successfully', 'success');
-        }else{
-            showNotification('Failed to save file', 'error');
-        }
-    }catch(error){
-        console.error('Error saving file:', error);
-        showNotification('Failed to save file', 'error');
-    }
-}
-
-// 添加项目到后端
-const setProject = async(path) => {
-    try{
-        const response = await fetch('http://localhost:5000/project', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({path})
-        });
-
-        const result = await response.json();
-        if(result.status === 'success'){
-            project.value = result.path;
-        }else{
-            showNotification('Failed to add project', 'error');
-        }
-    }catch(error){
-        console.error('Error adding project:', error);
-        showNotification('Failed to add project', 'error');
-    }
-}
-
-// 加载项目树
-const loadProjectTree = async(projectName) => {
-    try{
-        const response = await fetch('http://localhost:5000/project/tree', {
-            method: 'POST',
-            headers:{
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({name: projectName})
-        });
-
-        const result = await response.json();
-        if(result.status === 'success'){
-            fileTree.value = result.tree;
-            if(!currentFilePath.value && editor){
-                editor.updateOptions({readOnly: true});
-            }
-        }else{
-            showNotification('Failed to load project', 'error');
-        }
-    }catch(error){
-        console.error('Error loading project Tree:', error);
-        showNotification('Failed to load project', 'error');
-    }
-}
-
-// 加载当前项目
-const loadCurrentProject = async() => {
-    try{
-        const response = await fetch('http://localhost:5000/project');
-        const result = await response.json();
-        if(result.status === 'success' && result.project){
-            project.value = result.project;
-            await loadProjectTree(result.project);
-        }
-    }catch(error){
-        console.error('Error loading project:', error);
-        showNotification('Failed to load project', 'error');
-    }
-}
-
-const downloadProject = async() => {
-    try{
-        // 检查是否有未保存的修改
-        if(isContentModified.value && currentFilePath.value){
-            const save = confirm('There are unsaved changes. Do you want to save them before downloading?');
-            if(save){
-                await saveFile();
-            }
-        }
-
-        const response = await fetch(`http://localhost:5000/project/download`, {
-            method: 'POST',
-            headers:{
-                'Content-Type':'application/json'
-            },
-            body: JSON.stringify({
-                projectName: project.value,
-                path: '.',
-                type: 'project'
-            })
-        });
-
-        if(response.ok){
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-
-            a.href = url;
-            a.download = project.value + '.zip';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-        }else{
-            const error = await response.json();
-            showNotification('Failed to download', 'error');
-        }
-    }catch(error){
-        console.error('Download Failed:', error);
-        showNotification('Failed to download', 'error');
-    }
-}
-
-// ---虚拟环境相关功能---
-const showImportModal = ref(false)
-const importEnvMethod = ref('requirements')
-const selectedEnvType = ref(null)
-const pythonVersion = ref('python3.12')
-const requirementFile = ref(null)
-const isCreatingEnv = ref(false)
-const creatingEnvStep = ref('Initializing')
-const envCreationProgress = ref(0)
-const envCreationError = ref('')
-
-const currentEnv = ref({
-    pythonVersion: '',
-    dependencies: [],
-    path: ''
-})
-const targetEnv = ref({
-    pythonVersion: '',
-    dependencies: [],
-    path: ''
-})
-
-// 打开导入环境窗口
-const openImportEnvModal = (envType) => {
-    selectedEnvType.value = envType;
-    showImportModal.value = true;
-    requirementFile.value = null;
-}
-
-// 关闭导入环境窗口
-const closeImportEnvModal = () => {
-    showImportModal.value = false;
-    selectedEnvType.value = '';
-}
-
-// 选择文件
-const handleRequirementSelect = (e) => {
-    const file = e.target.files[0];
-
-    if(importEnvMethod.value === 'requirements'){
-        if(file && file.name.toLowerCase().endsWith('.txt')){
-        requirementFile.value = file;
-        }else{
-            showNotification('Please select a valid .txt file', 'warning');
-            e.target.value = '';
-        }
-    }
-}
-
-// 创建虚拟环境
-const createEnvironment = async() => {
-    if(importEnvMethod.value == 'requirements'){
-        if(!requirementFile.value){
-            showNotification('Please select a requirements file', 'warning');
-            return;
-        }
-
-        isCreatingEnv.value = true;
-        envCreationError.value = '';
-        envCreationProgress.value = 0;
-        creatingEnvStep.value = 'Creating virtual environment'
-
-        try{
-            const formData = new FormData();
-            formData.append('importEnvMethod', 'requirements');
-            formData.append('envType', selectedEnvType.value);
-            formData.append('pythonVersion', pythonVersion.value);
-            formData.append('requirements', requirementFile.value);
-
-            const response = await fetch('http://localhost:5000/venv/create', {
-                method: 'POST',
-                body: formData
-            })
-
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-
-            // 持续获取创建进度
-            while(true){
-                const {done, value} = await reader.read();
-                if(done) break;
-
-                const chunk = decoder.decode(value, {stream: true});
-                const lines = chunk.split('\n');
-
-                for(const line of lines){
-                    if(line.startsWith('data: ')){
-                        try{
-                            const data = JSON.parse(line.substring(6));
-
-                            if(data.status === 'progress'){
-                                creatingEnvStep.value = data.step;
-                                envCreationProgress.value = data.progress;
-                            }else if(data.status === 'error'){
-                                envCreationError.value = data.message.replace(/\u001b\[[0-9;]*m/g, '');  // 去除ANSI控制字符
-                                isCreatingEnv.value = false;
-                                return;
-                            }else if(data.status === 'success'){
-                                envCreationProgress.value = 100;
-                                creatingEnvStep.value = 'Environment created successfully';
-
-                                if(selectedEnvType.value === 'current'){
-                                    currentEnv.value = {
-                                        pythonVersion: pythonVersion.value,
-                                        dependencies: data.dependencies || [],
-                                        path: data.path
-                                    };
-                                }else{
-                                    targetEnv.value = {
-                                        pythonVersion: pythonVersion.value,
-                                        dependencies: data.dependencies || [],
-                                        path: data.path
-                                    };
-                                }
-
-                                setTimeout(() => {
-                                    showNotification(`${selectedEnvType.value} environment created successfully`, 'success')
-                                    closeImportEnvModal();
-                                }, 1000);
-
-                                isCreatingEnv.value = false;
-                                return;
-                            }
-                        }catch(e){
-                            console.error('Error parsing JSON:', e);
-                        }
-                    }
-                }
-            }
-        }catch(error){
-            envCreationError.value = error.message
-            console.error('Error creating environment:', error);
-            showNotification(`Failed to create ${selectedEnvType.value} environment: `, 'error');
-            isCreatingEnv.value = false;
-        }
-    }
-}
-
-const showEnvDetailsModal = ref(false)
-const envDetails = ref({})
-const selectedEnvDetailsType = ref('')
-
-const openEnvDetailsModal = (envType) =>{
-    selectedEnvDetailsType.value = envType;
-    if(envType === 'current'){
-        envDetails.value = currentEnv.value;
-    }else{
-        envDetails.value = targetEnv.value;
-    }
-    showEnvDetailsModal.value = true;
-}
-
-const closeEnvDetailsModal = () => {
-    showEnvDetailsModal.value = false;
-    selectedEnvDetailsType.value = '';
-    envCreationProgress.value = 0;
-    envCreationError.value = '';
-    creatingEnvStep.value = 'Initializing';
-}
-
-// ---通用函数---
-// 消息弹窗功能
-const showNotification = (message, type) => {
-    const notification = document.createElement('div');
-    notification.textContent = message;
-
-    notification.style.position = 'fixed';
-    notification.style.left = '50%';
-    notification.style.top = '20px';
-    notification.style.borderRadius = '5px';
-    notification.style.color = 'white';
-    notification.style.zIndex = '9999';
-    notification.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.2)'
-    notification.style.transition = 'all 0.3s ease'
-    notification.style.opacity = '0'
-    notification.style.transform = 'translateX(-50%)'
-    notification.style.fontSize = '20px'
-
-    if(type === 'success'){
-        notification.style.backgroundColor = '#4CAF50'
-    }else if(type === 'warning'){
-        notification.style.backgroundColor = '#FFC107'
-    }else{
-        notification.style.backgroundColor = '#F44336'
-    }
-    
-
-    document.body.appendChild(notification);
-
-    setTimeout(() =>{
-        notification.style.opacity = '1';
-        notification.style.transform = 'translateY(0)';
-    }, 10);
-
-    setTimeout(() => {
-        notification.style.opacity = '0';
-        notification.style.transform = 'translateY(20px)';
-        setTimeout(() => {
-            document.body.removeChild(notification);
-        }, 300);
-    }, 2000);
-}
-
-// ---网页初始化---
+// 项目视图状态
 const projectView = ref('project')
+
+// 编辑器相关
 const editorRef = ref(null)
 let editor = null
 let handleKeyDown = null
@@ -877,7 +285,7 @@ const runCommand = ref('')
 onMounted(() => { 
     // 创建编辑器实例
     if(editorRef.value){
-        editor = monaco.editor.create(editorRef.value, {
+        window.editor = monaco.editor.create(editorRef.value, {
             value: '',
             language: 'python',
             scrollBeyondLastLine: false,
@@ -893,8 +301,8 @@ onMounted(() => {
             fontFamily: 'ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, "DejaVu Sans Mono", monospace'
         })
 
-        editor.onDidChangeModelContent(() => {
-            const currentContent = editor.getValue();
+        window.editor.onDidChangeModelContent(() => {
+            const currentContent = window.editor.getValue();
             isContentModified.value = (currentContent !== originalContent.value);
         })
     }
@@ -940,8 +348,8 @@ onMounted(() => {
         if(newTerminalBarWidth > 150 && newMiddleWidth > 600){
             terminalBar.style.width = `${newTerminalBarWidth}px`;
             appMiddle.style.width = `${newMiddleWidth}px`;
-            if(editor){
-                editor.layout();
+            if(window.editor){
+                window.editor.layout();
             }
         }
     }
@@ -959,9 +367,9 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-    if(editor){
-        editor.dispose();
-        editor = null;
+    if(window.editor){
+        window.editor.dispose();
+        window.editor = null;
     }
 
     document.removeEventListener('keydown', handleKeyDown);
