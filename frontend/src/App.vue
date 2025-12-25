@@ -77,47 +77,6 @@
             </div>
 
             <div class="app-middle">
-                <!-- 配置栏 -->
-                <div class="app-config">
-                    <div class="app-env">
-                        <div class="env-section">
-                            <button class="env-display-button" @click="openEnvDetailsModal('current')">
-                                <b>currentEnv:</b>
-                                <span v-if="currentEnv.pythonVersion">{{currentEnv.pythonVersion}}</span>
-                            </button>
-                            <button class="env-add-button" @click="openImportEnvModal('current')">import</button>
-                        </div>
-                        <div class="env-section">
-                            <button class="env-display-button" @click="openEnvDetailsModal('target')">
-                                <b>targetEnv:</b>
-                                <span v-if="currentEnv.pythonVersion">{{targetEnv.pythonVersion}}</span>
-                            </button>
-                            <button class="env-add-button" @click="openImportEnvModal('target')">import</button>
-                        </div>
-                    </div>
-                    <div class="app-target">
-                        <b>Libraries to Fix</b>
-                        <select class="target-select">
-                            <option value="lib1">lib1</option>
-                            <option value="lib2">lib2</option>
-                            <option value="lib3">lib3</option>
-                        </select>
-                        <button class="run-button">Run</button>
-                    </div>
-                </div>
-
-                <!-- 运行命令栏 -->
-                <div class="app-command"> 
-                    <div class="command-container">
-                        <input 
-                            type="text"
-                            class="command-input"
-                            placeholder="Please enter the project run command"
-                            v-model="runCommand"
-                        />
-                    </div>   
-                </div>
-
                 <!-- 代码编辑栏 -->
                 <div class="app-code">
                     <div class="editor-container" ref="editorRef" :class="{disabled: !currentFilePath}" v-show="currentFilePath"></div>
@@ -125,14 +84,58 @@
                         <b>choose a file(.py / .txt) to edit</b>
                     </div>
                 </div>
-            </div>
-
-            <!-- 终端栏 -->
-            <div class="app-wrapper">
-                <div class="resizer"></div>
+                
                 <div class="app-terminal">
                     <b>Terminal</b>
                 </div>
+            </div>
+
+            <!-- 配置栏 -->
+            <div class="app-configuration">
+                <b>Configuration</b>
+                <!-- 环境配置栏 -->
+                <div class="app-env">
+                        <b>Import Virtual Environment</b>
+                        <div class="env-section">
+                            <button class="env-display-button" @click="openEnvDetailsModal('current')">
+                                <b>currentEnv</b>
+                                <span v-if="currentEnv.pythonVersion">{{currentEnv.pythonVersion}}</span>
+                            </button>
+                            <button class="env-add-button" @click="openImportEnvModal('current')">import</button>
+                        </div>
+                        <div class="env-section">
+                            <button class="env-display-button" @click="openEnvDetailsModal('target')">
+                                <b>targetEnv</b>
+                                <span v-if="currentEnv.pythonVersion">{{targetEnv.pythonVersion}}</span>
+                            </button>
+                            <button class="env-add-button" @click="openImportEnvModal('target')">import</button>
+                        </div>
+                    </div>
+
+                <!-- 修复库配置栏 -->
+                <div class="app-target">
+                    <b>Libraries to Fix</b>
+                    <select class="target-select">
+                        <option value="lib1">lib1</option>
+                        <option value="lib2">lib2</option>
+                        <option value="lib3">lib3</option>
+                    </select>
+                </div>
+
+                <!-- 运行命令配置栏 -->
+                <div class="app-command"> 
+                    <b>Run Command</b>
+                    <div class="command-container">
+                        <input 
+                            type="text"
+                            class="command-input"
+                            placeholder="Enter project run command"
+                            v-model="runCommand"
+                        />
+                    </div>   
+                </div>
+
+                <button class="run-button">Run</button>     
             </div>
         </div>
     </div>
@@ -319,50 +322,6 @@ onMounted(() => {
 
     document.addEventListener('keydown', handleKeyDown);
 
-    // 实现拉伸功能
-    const resizer = document.querySelector('.resizer');
-    const terminalBar = document.querySelector('.app-terminal');
-    const appMain = document.querySelector('.app-main');
-    const appMiddle = document.querySelector('.app-middle');
-
-    const validWidth = appMain.offsetWidth - document.querySelector('.app-project').offsetWidth;
-    let startX, startMiddleWidth, startTerminalWidth;
-
-    const mouseDownHandler = function(e){
-        startX = e.clientX;
-        startMiddleWidth = appMiddle.offsetWidth;
-        startTerminalWidth = terminalBar.offsetWidth;
-
-        document.addEventListener('mousemove', mouseMoveHandler)
-        document.addEventListener('mouseup', mouseUpHandler)
-        resizer.style.cursor = 'col-resize';
-        document.body.style.cursor ='col-resize';
-        e.preventDefault();
-    };
-
-    const mouseMoveHandler = function(e){ 
-        const deltaX = e.clientX - startX;
-        const newTerminalBarWidth = startTerminalWidth - deltaX;
-        const newMiddleWidth = startMiddleWidth + deltaX;
-
-        if(newTerminalBarWidth > 150 && newMiddleWidth > 600){
-            terminalBar.style.width = `${newTerminalBarWidth}px`;
-            appMiddle.style.width = `${newMiddleWidth}px`;
-            if(window.editor){
-                window.editor.layout();
-            }
-        }
-    }
-
-    const mouseUpHandler = function(){
-        resizer.style.cursor = '';
-        document.body.style.cursor = '';
-        document.removeEventListener('mousemove', mouseMoveHandler)
-        document.removeEventListener('mouseup', mouseUpHandler)
-    }
-
-    resizer.addEventListener('mousedown', mouseDownHandler);
-
     loadCurrentProject();
 })
 
@@ -377,10 +336,10 @@ onUnmounted(() => {
 </script>
 
 <style lang="scss">
-@import "./styles/base.scss";
-@import "./styles/layout.scss";
-@import "./styles/project.scss";
-@import "./styles/config.scss";
-@import "./styles/editor.scss";
-@import "./styles/modal.scss";
+@use "./styles/_base.scss";
+@use "./styles/_layout.scss";
+@use "./styles/_project.scss";
+@use "./styles/_config.scss";
+@use "./styles/_editor.scss";
+@use "./styles/_modal.scss";
 </style>

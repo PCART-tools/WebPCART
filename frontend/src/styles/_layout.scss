@@ -41,19 +41,10 @@
     width: 100%;
 }
 
-/* 项目拉伸 */
-.app-wrapper{
+/* 中心部分 */
+.app-middle{
+    flex: 1;
     display: flex;
-    min-width: 200px;
-}
-
-.resizer{ 
-    width: 5px;
-    cursor: col-resize;
-    background-color: #ccc;
-}
-
-.resizer:hover{
-    background-color: #999;
-    cursor: col-resize;
+    flex-direction: column;
+    border-right: 1px solid #e0e0e0;
 }
