@@ -14,31 +14,23 @@ logger = logging.getLogger(__name__)
 
 venv_bp = Blueprint('venv', __name__)
 
-VENV_BASE_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'venv')
-os.makedirs(VENV_BASE_PATH, exist_ok=True)
+# 读取配置文件
+config_path = os.path.join(os.path.dirname(__file__), '..', 'config.json')
+with open(config_path, 'r', encoding='utf-8') as f:
+    config = json.load(f)
 
-# 根据python版本获取setuptools
-def get_setuptools_version(python_version):
-    version_match = re.search(r'python(\d+\.\d+)', python_version)
-    version = version_match.group(1)
-    major, minor = map(int, version.split('.'))
+ENV_BASE_PATH = os.path.join(os.path.dirname(__file__), '..', '..', config['env_base_path'])
+CONDA_PATH = config['conda_path']
 
-    if major > 3 or (major == 3 and minor >= 12):   # Python 3.12及以上
-        return "setuptools>=65.5.0"
-    elif major == 3 and minor >= 10:    # Python 3.10及以上
-        return "setuptools>=58.0.0,<66.0.0"
-    else:   # 其他版本
-        return "setuptools"
-    
 # 获取已安装的依赖列表
-def get_packages(pip_path):
+def get_packages(env_path):
     try:
-        result = subprocess.run([pip_path, 'freeze'],
+        result = subprocess.run([CONDA_PATH, 'list', '-p', env_path, '--json'],
                                 capture_output=True,
                                 text=True)
         if result.returncode == 0:
-            dependencies = result.stdout.strip().split('\n')
-            dependencies = [dep for dep in dependencies if dep]
+            packages_data = json.loads(result.stdout)
+            dependencies = [f"{pkg['name']}={pkg['version']}" for pkg in packages_data]
             return dependencies
         else:
             logger.error(f'Failed to get installed packages: {result.stderr}')
@@ -65,86 +57,61 @@ def create_venv():
             time.sleep(0.5)
 
             # 创建虚拟环境目录
-            env_path = os.path.join(VENV_BASE_PATH, f"{env_type}")
+            env_path = os.path.join(ENV_BASE_PATH, f"{env_type}")
             if os.path.exists(env_path):
                 yield f"data: {json.dumps({'status':'progress', 'step':'Removing existing environment', 'progress':10})}\n\n"
                 time.sleep(0.5)
 
-                shutil.rmtree(env_path)
+                logger.error(f"{env_path}")
+                subprocess.run([CONDA_PATH, 'env', 'remove', '-y', '-p', env_path], capture_output=True)
 
             if importEnvMethod == "requirements":   # 使用requirements导入环境
                 # 创建虚拟环境
-                yield f"data: {json.dumps({'status':'progress', 'step':'Creating virtual environment', 'progress':15})}\n\n"
+                yield f"data: {json.dumps({'status':'progress', 'step':'Creating conda environment', 'progress':15})}\n\n"
 
-                result = subprocess.run([python_version, '-m', 'venv', env_path],
+                python_version_num = python_version.replace('python', '')   # 提取版本号
+
+                logger.error(f"{env_path} : {python_version_num}")
+                result = subprocess.run([CONDA_PATH, 'create', '-y', '-p', env_path, f'python={python_version_num}'],
                                         capture_output=True, 
                                         text=True)
                 if result.returncode != 0:
-                    yield f"data: {json.dumps({'status':'error', 'message': f'Failed to create: {result.stderr}'})}\n\n"
+                    yield f"data: {json.dumps({'status':'error', 'message': f'Failed to create environment: {result.stderr}'})}\n\n"
                     return
 
-                yield f"data: {json.dumps({'status':'progress', 'step':'Virtual envrionment created', 'progress':25})}\n\n"
+                yield f"data: {json.dumps({'status':'progress', 'step':'Conda envrionment created', 'progress':25})}\n\n"
                 time.sleep(0.5)
 
-                pip_path = os.path.join(env_path, 'Scripts', 'pip.exe') if os.name == 'nt' else os.path.join(env_path, 'bin', 'pip') 
+                yield f"data: {json.dumps({'status':'progress', 'step':'Installing dependencies', 'progress':30})}\n\n"
                 
-                # 升级pip
-                yield f"data: {json.dumps({'status':'progress', 'step':'Upgrading pip', 'progress':30})}\n\n"
-
-                result = subprocess.run([pip_path, 'install', '--upgrade', 'pip'],
-                                        capture_output=True,
-                                        text=True)
-                if result.returncode != 0:
-                    yield f"data: {json.dumps({'status':'error', 'message': f'Failed to upgrade pip: {result.stderr}'})}\n\n"
-                    return
-                
-                yield f"data: {json.dumps({'status':'progress', 'step':'Pip upgraded', 'progress':40})}\n\n"
-                time.sleep(0.5)
-                    
-                # 安装setuptools 和 wheel
-                yield f"data: {json.dumps({'status':'progress', 'step':'Installing setuptools and wheel', 'progress':45})}\n\n"
-
-                setuptools_version = get_setuptools_version(python_version)
-                result = subprocess.run([pip_path, 'install', setuptools_version, 'wheel'],
-                                            capture_output=True,
-                                            text=True)
-                if result.returncode != 0:
-                    yield f"data: {json.dumps({'status':'error', 'message': f'Failed to install setuptools and wheel: {result.stderr}'})}\n\n"
-                    return
-                
-                yield f"data: {json.dumps({'status':'progress', 'step':'Setuptools and wheel installed', 'progress':55})}\n\n"
-                time.sleep(0.5)
-                
-                # 安装依赖
-                yield f"data: {json.dumps({'status':'progress', 'step':'Installing dependencies', 'progress':60})}\n\n"
-
                 with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as temp_req:
                     temp_req.write(requirements_content)
                     req_path = temp_req.name
-
-                result = subprocess.run([pip_path, 'install', '--prefer-binary' , '-r', req_path],
-                                        capture_output=True,
-                                        text=True)
-                os.unlink(req_path)
+                
+                result = subprocess.run([CONDA_PATH, 'install', '-p', env_path, '--file', req_path, '-y'],
+                                        capture_output=True, text=True)
+                
                 if result.returncode != 0:
-                    logger.error(f'Failed to install dependencies: {result.stderr}')
-                    logger.error(f'STDOUT: {result.stdout}')
-            
+                    os.unlink(req_path)
                     yield f"data: {json.dumps({'status':'error', 'message': f'Failed to install dependencies: {result.stderr}'})}\n\n"
                     return
-                
+
+                os.unlink(req_path)
+
                 yield f"data: {json.dumps({'status':'progress', 'step':'Dependencies installed', 'progress':90})}\n\n"
+                time.sleep(0.5)
                 
-                dependencies = get_packages(pip_path)
 
                 yield f"data: {json.dumps({'status':'progress', 'step':'Finalizing', 'progress':95})}\n\n"
-                time.sleep(0.5)
+                
+                dependencies = get_packages(env_path)
                 
                 result_data = {
                     'status': 'success',
                     'path': env_path,
                     'dependencies': dependencies,
-                    'pythonVersion': python_version
+                    'pythonVersion': python_version,
+                    'envType': env_type
                 }
 
                 yield f"data: {json.dumps(result_data)}\n\n"     

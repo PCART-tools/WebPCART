@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { showNotification } from './utils'
 
+// TODO：新增使用packages导入环境的方法
 // 虚拟环境相关状态
 const showImportModal = ref(false)
 const importEnvMethod = ref('requirements')
@@ -50,6 +51,7 @@ export const handleRequirementSelect = (e) => {
     }
 }
 
+// TODO: 当前环境和目标环境不能同时进行导入
 // 创建虚拟环境
 export const createEnvironment = async() => {
     if(importEnvMethod.value == 'requirements'){
@@ -101,16 +103,17 @@ export const createEnvironment = async() => {
                             }else if(data.status === 'success'){
                                 envCreationProgress.value = 100;
                                 creatingEnvStep.value = 'Environment created successfully';
+                                const tempEnvType = data.envType
 
-                                if(selectedEnvType.value === 'current'){
+                                if(tempEnvType === 'current'){
                                     currentEnv.value = {
-                                        pythonVersion: pythonVersion.value,
+                                        pythonVersion: data.pythonVersion,
                                         dependencies: data.dependencies || [],
                                         path: data.path
                                     };
                                 }else{
                                     targetEnv.value = {
-                                        pythonVersion: pythonVersion.value,
+                                        pythonVersion: data.pythonVersion,
                                         dependencies: data.dependencies || [],
                                         path: data.path
                                     };

@@ -99,14 +99,12 @@
                         <div class="env-section">
                             <button class="env-display-button" @click="openEnvDetailsModal('current')">
                                 <b>currentEnv</b>
-                                <span v-if="currentEnv.pythonVersion">{{currentEnv.pythonVersion}}</span>
                             </button>
                             <button class="env-add-button" @click="openImportEnvModal('current')">import</button>
                         </div>
                         <div class="env-section">
                             <button class="env-display-button" @click="openEnvDetailsModal('target')">
                                 <b>targetEnv</b>
-                                <span v-if="currentEnv.pythonVersion">{{targetEnv.pythonVersion}}</span>
                             </button>
                             <button class="env-add-button" @click="openImportEnvModal('target')">import</button>
                         </div>
