@@ -53,25 +53,23 @@ def create_venv():
         requirements_content = requirements_file.read().decode('utf-8')
     def generate_progress():
         try:
-            yield f"data: {json.dumps({'status':'progress', 'step':'Initializing', 'progress':5})}\n\n"
+            yield f"data: {json.dumps({'status':'progress', 'step':'Initializing', 'progress':5, 'type':env_type})}\n\n"
             time.sleep(0.5)
 
             # 创建虚拟环境目录
             env_path = os.path.join(ENV_BASE_PATH, f"{env_type}")
             if os.path.exists(env_path):
-                yield f"data: {json.dumps({'status':'progress', 'step':'Removing existing environment', 'progress':10})}\n\n"
+                yield f"data: {json.dumps({'status':'progress', 'step':'Removing existing environment', 'progress':10, 'type':env_type})}\n\n"
                 time.sleep(0.5)
 
-                logger.error(f"{env_path}")
                 subprocess.run([CONDA_PATH, 'env', 'remove', '-y', '-p', env_path], capture_output=True)
 
             if importEnvMethod == "requirements":   # 使用requirements导入环境
                 # 创建虚拟环境
-                yield f"data: {json.dumps({'status':'progress', 'step':'Creating conda environment', 'progress':15})}\n\n"
+                yield f"data: {json.dumps({'status':'progress', 'step':'Creating conda environment', 'progress':15, 'type':env_type})}\n\n"
 
                 python_version_num = python_version.replace('python', '')   # 提取版本号
 
-                logger.error(f"{env_path} : {python_version_num}")
                 result = subprocess.run([CONDA_PATH, 'create', '-y', '-p', env_path, f'python={python_version_num}'],
                                         capture_output=True, 
                                         text=True)
@@ -79,10 +77,10 @@ def create_venv():
                     yield f"data: {json.dumps({'status':'error', 'message': f'Failed to create environment: {result.stderr}'})}\n\n"
                     return
 
-                yield f"data: {json.dumps({'status':'progress', 'step':'Conda envrionment created', 'progress':25})}\n\n"
+                yield f"data: {json.dumps({'status':'progress', 'step':'Conda envrionment created', 'progress':25, 'type':env_type})}\n\n"
                 time.sleep(0.5)
 
-                yield f"data: {json.dumps({'status':'progress', 'step':'Installing dependencies', 'progress':30})}\n\n"
+                yield f"data: {json.dumps({'status':'progress', 'step':'Installing dependencies', 'progress':30, 'type':env_type})}\n\n"
                 
                 with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as temp_req:
                     temp_req.write(requirements_content)
@@ -93,16 +91,16 @@ def create_venv():
                 
                 if result.returncode != 0:
                     os.unlink(req_path)
-                    yield f"data: {json.dumps({'status':'error', 'message': f'Failed to install dependencies: {result.stderr}'})}\n\n"
+                    yield f"data: {json.dumps({'status':'error', 'message': f'Failed to install dependencies: {result.stderr}', 'type':env_type})}\n\n"
                     return
 
                 os.unlink(req_path)
 
-                yield f"data: {json.dumps({'status':'progress', 'step':'Dependencies installed', 'progress':90})}\n\n"
+                yield f"data: {json.dumps({'status':'progress', 'step':'Dependencies installed', 'progress':90, 'type':env_type})}\n\n"
                 time.sleep(0.5)
                 
 
-                yield f"data: {json.dumps({'status':'progress', 'step':'Finalizing', 'progress':95})}\n\n"
+                yield f"data: {json.dumps({'status':'progress', 'step':'Finalizing', 'progress':95, 'type':env_type})}\n\n"
                 
                 dependencies = get_packages(env_path)
                 
@@ -111,16 +109,16 @@ def create_venv():
                     'path': env_path,
                     'dependencies': dependencies,
                     'pythonVersion': python_version,
-                    'envType': env_type
+                    'type': env_type
                 }
 
                 yield f"data: {json.dumps(result_data)}\n\n"     
             else:
-                yield f"data: {json.dumps({'status':'error', 'message': 'Unsupported importEnvMethod'})}\n\n"
+                yield f"data: {json.dumps({'status':'error', 'message': 'Unsupported importEnvMethod', 'type':env_type})}\n\n"
         except Exception as e:
             logger.error(f'Failed to create: {str(e)}')
 
-            yield f"data: {json.dumps({'status':'error', 'message': f'Exception during environment creation: {str(e)}'})}\n\n"
+            yield f"data: {json.dumps({'status':'error', 'message': f'Exception during environment creation: {str(e)}', 'type':env_type})}\n\n"
     return Response(generate_progress(), mimetype='text/event-stream')
         
     

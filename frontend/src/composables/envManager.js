@@ -8,16 +8,21 @@ const importEnvMethod = ref('requirements')
 const selectedEnvType = ref(null)
 const pythonVersion = ref('python3.12')
 const requirementFile = ref(null)
-const isCreatingEnv = ref(false)
-const creatingEnvStep = ref('Initializing')
-const envCreationProgress = ref(0)
-const envCreationError = ref('')
 
+const isCreatingCurrentEnv = ref(false)
+const currentCreatingEnvStep = ref('Initializing')
+const currentEnvCreationProgress = ref(0)
+const currentEnvCreationError = ref('')
 const currentEnv = ref({
     pythonVersion: '',
     dependencies: [],
     path: ''
 })
+
+const isCreatingTargetEnv = ref(false)
+const targetCreatingEnvStep = ref('Initializing')
+const targetEnvCreationProgress = ref(0)
+const targetEnvCreationError = ref('')
 const targetEnv = ref({
     pythonVersion: '',
     dependencies: [],
@@ -60,10 +65,18 @@ export const createEnvironment = async() => {
             return;
         }
 
-        isCreatingEnv.value = true;
-        envCreationError.value = '';
-        envCreationProgress.value = 0;
-        creatingEnvStep.value = 'Creating virtual environment'
+        if(selectedEnvType.value === 'current'){
+            isCreatingCurrentEnv.value = true;
+            currentEnvCreationError.value = '';
+            currentEnvCreationProgress.value = 0;
+            currentCreatingEnvStep.value = 'Creating virtual environment'
+        }else{
+            isCreatingTargetEnv.value = true;
+            targetEnvCreationError.value = '';
+            targetEnvCreationProgress.value = 0;
+            targetCreatingEnvStep.value = 'Creating virtual environment' 
+        }
+        
 
         try{
             const formData = new FormData();
@@ -93,40 +106,60 @@ export const createEnvironment = async() => {
                         try{
                             const data = JSON.parse(line.substring(6));
 
-                            if(data.status === 'progress'){
-                                creatingEnvStep.value = data.step;
-                                envCreationProgress.value = data.progress;
-                            }else if(data.status === 'error'){
-                                envCreationError.value = data.message.replace(/\u001b\[[0-9;]*m/g, '');  // 去除ANSI控制字符
-                                isCreatingEnv.value = false;
-                                return;
-                            }else if(data.status === 'success'){
-                                envCreationProgress.value = 100;
-                                creatingEnvStep.value = 'Environment created successfully';
-                                const tempEnvType = data.envType
+                            if(data.type == 'current'){
+                                if(data.status === 'progress'){
+                                    currentCreatingEnvStep.value = data.step;
+                                    currentEnvCreationProgress.value = data.progress;
+                                }else if(data.status === 'error'){
+                                    currentEnvCreationError.value = data.message.replace(/\u001b\[[0-9;]*m/g, '');  // 去除ANSI控制字符
+                                    isCreatingCurrentEnv.value = false;
+                                    return;
+                                }else if(data.status === 'success'){
+                                    currentEnvCreationProgress.value = 100;
+                                    currentCreatingEnvStep.value = 'Environment created successfully';
 
-                                if(tempEnvType === 'current'){
                                     currentEnv.value = {
                                         pythonVersion: data.pythonVersion,
                                         dependencies: data.dependencies || [],
                                         path: data.path
                                     };
-                                }else{
+
+                                    setTimeout(() => {
+                                        showNotification(`Current environment created successfully`, 'success')
+                                        closeImportEnvModal();
+                                    }, 1000);
+
+                                    isCreatingCurrentEnv.value = false;
+                                    return;
+                                }
+                            }else{
+                                if(data.status === 'progress'){
+                                    targetCreatingEnvStep.value = data.step;
+                                    targetEnvCreationProgress.value = data.progress;
+                                }else if(data.status === 'error'){
+                                    targetEnvCreationError.value = data.message.replace(/\u001b\[[0-9;]*m/g, '');  // 去除ANSI控制字符
+                                    isCreatingTargetEnv.value = false;
+                                    return;
+                                }else if(data.status === 'success'){
+                                    targetEnvCreationProgress.value = 100;
+                                    targetCreatingEnvStep.value = 'Environment created successfully';
+
                                     targetEnv.value = {
                                         pythonVersion: data.pythonVersion,
                                         dependencies: data.dependencies || [],
                                         path: data.path
                                     };
-                                }
 
-                                setTimeout(() => {
-                                    showNotification(`${selectedEnvType.value} environment created successfully`, 'success')
-                                    closeImportEnvModal();
-                                }, 1000);
+                                    setTimeout(() => {
+                                        showNotification(`Target environment created successfully`, 'success')
+                                        closeImportEnvModal();
+                                    }, 1000);
 
-                                isCreatingEnv.value = false;
-                                return;
+                                    isCreatingTargetEnv.value = false;
+                                    return;
+                                }                                
                             }
+                            
                         }catch(e){
                             console.error('Error parsing JSON:', e);
                         }
@@ -134,13 +167,34 @@ export const createEnvironment = async() => {
                 }
             }
         }catch(error){
-            envCreationError.value = error.message
+            if(selectedEnvType.value == 'current'){
+                currentEnvCreationError.value = error.message;
+                isCreatingCurrentEnv.value = false;
+            }else{
+                targetEnvCreationError.value = error.message;
+                isCreatingTargetEnv.value = false;
+            }
+
             console.error('Error creating environment:', error);
             showNotification(`Failed to create ${selectedEnvType.value} environment: `, 'error');
-            isCreatingEnv.value = false;
         }
     }
 }
+
+// 获取环境创建状态 
+export const getCurrentEnvCreationStatus = () => ({
+    isCreating: isCreatingCurrentEnv.value,
+    step: currentCreatingEnvStep.value,
+    progress: currentEnvCreationProgress.value,
+    error: currentEnvCreationError.value
+})
+
+export const getTargetEnvCreationStatus = () => ({
+    isCreating: isCreatingTargetEnv.value,
+    step: targetCreatingEnvStep.value,
+    progress: targetEnvCreationProgress.value,
+    error: targetEnvCreationError.value
+})
 
 const showEnvDetailsModal = ref(false)
 const envDetails = ref({})
@@ -159,9 +213,6 @@ export const openEnvDetailsModal = (envType) =>{
 export const closeEnvDetailsModal = () => {
     showEnvDetailsModal.value = false;
     selectedEnvDetailsType.value = '';
-    envCreationProgress.value = 0;
-    envCreationError.value = '';
-    creatingEnvStep.value = 'Initializing';
 }
 
 // 导出相关状态
@@ -171,12 +222,14 @@ export {
     selectedEnvType,
     pythonVersion,
     requirementFile,
-    isCreatingEnv,
-    creatingEnvStep,
-    envCreationProgress,
-    envCreationError,
-    currentEnv,
-    targetEnv,
+    isCreatingCurrentEnv,
+    currentCreatingEnvStep,
+    currentEnvCreationProgress,
+    currentEnvCreationError,
+    isCreatingTargetEnv,
+    targetCreatingEnvStep,
+    targetEnvCreationProgress,
+    targetEnvCreationError,
     showEnvDetailsModal,
     envDetails,
     selectedEnvDetailsType

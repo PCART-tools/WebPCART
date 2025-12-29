@@ -171,23 +171,27 @@
                 </div>
             </div>
 
-            <div v-if="isCreatingEnv" class="progress-section">
-                <div class="progress-label">{{creatingEnvStep}}</div>
+            <div v-if="selectedEnvType == 'current' ? isCreatingCurrentEnv : isCreatingTargetEnv" class="progress-section">
+                <div class="progress-label">
+                    {{selectedEnvType == 'current'? currentCreatingEnvStep : targetCreatingEnvStep}}
+                </div>
                 <div class="progress-bar-background">
                     <div class="progress-bar-fill"
-                     :style="{width: envCreationProgress + '%'}"></div>
+                     :style="{width: (selectedEnvType == 'current' ? currentEnvCreationProgress : targetEnvCreationProgress) + '%'}"></div>
                 </div>
             </div>
 
-            <div v-if="envCreationError" class="error-message">{{envCreationError}}</div>
+            <div v-if="selectedEnvType == 'current' ? currentEnvCreationError : targetEnvCreationError" class="error-message">
+                {{selectedEnvType === 'current' ? currentEnvCreationError : targetEnvCreationError}}
+            </div>
 
             <div class="modal-footer">
                 <button @click="closeImportEnvModal" class="cancel-button">Cancel</button>
                 <button
                     @click="createEnvironment"
                     class="confirm-button"
-                    :disabled="!requirementFile || isCreatingEnv">
-                    {{isCreatingEnv? 'Creating...' : 'Confirm'}}
+                    :disabled="!requirementFile || (selectedEnvType === 'current' ? isCreatingCurrentEnv : isCreatingTargetEnv)">
+                    {{(selectedEnvType === 'current' ? isCreatingCurrentEnv : isCreatingTargetEnv) ? 'Creating...' : 'Confirm'}}
                 </button>
             </div>
         </div>
@@ -234,32 +238,28 @@ import {
     fileTree, 
     uploadProgress, 
     isUploading, 
-    totalBatches, 
-    currentBatch, 
     currentFilePath, 
     originalContent, 
     isContentModified,
     selectFolder,
-    uploadFiles,
     saveFile,
-    setProject,
-    loadProjectTree,
     loadCurrentProject,
     downloadProject
 } from './composables/projectManager'
 
 import { 
     showImportModal,
-    importEnvMethod,
     selectedEnvType,
     pythonVersion,
     requirementFile,
-    isCreatingEnv,
-    creatingEnvStep,
-    envCreationProgress,
-    envCreationError,
-    currentEnv,
-    targetEnv,
+    isCreatingCurrentEnv,
+    currentCreatingEnvStep,
+    currentEnvCreationProgress,
+    currentEnvCreationError,
+    isCreatingTargetEnv,
+    targetCreatingEnvStep,
+    targetEnvCreationProgress,
+    targetEnvCreationError,
     showEnvDetailsModal,
     envDetails,
     selectedEnvDetailsType,
