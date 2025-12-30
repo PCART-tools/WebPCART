@@ -39,18 +39,37 @@ def get_packages(env_path):
         logger.error(f'Failed to get installed packages: {str(e)}')
         return []
 
+# 获取python版本
+def get_python_version(env_path):
+    python_exe = os.path.join(env_path, 'Scripts', 'python.exe') if os.name == 'nt' else os.path.join(env_path, 'bin', 'python')
+    if os.path.exists(python_exe):
+        result = subprocess.run([python_exe, '--version'],
+                                capture_output=True,
+                                text=True)
+        
+        if result.returncode == 0:
+            python_version = result.stdout.strip()
+        else:
+            python_version = 'Unknown'
+    else:
+        python_version = 'Unknown'
+
+    return python_version
 
 # 创建虚拟环境
 @venv_bp.route('/venv/create', methods=['POST'])
 def create_venv():
     env_type = request.form.get('envType')
     importEnvMethod = request.form.get("importEnvMethod")
-    python_version = request.form.get('pythonVersion', sys.executable)
+    python_version = request.form.get('pythonVersion', 'python3.9')
 
-    requirements_content = None
-    if 'requirements' in request.files:
+    if importEnvMethod == 'requirements':
         requirements_file = request.files['requirements']
         requirements_content = requirements_file.read().decode('utf-8')
+    elif importEnvMethod == 'environment':
+        environment_file = request.files['environment']
+        environment_content = environment_file.read().decode('utf-8')
+
     def generate_progress():
         try:
             yield f"data: {json.dumps({'status':'progress', 'step':'Initializing', 'progress':5, 'type':env_type})}\n\n"
@@ -112,7 +131,44 @@ def create_venv():
                     'type': env_type
                 }
 
-                yield f"data: {json.dumps(result_data)}\n\n"     
+                yield f"data: {json.dumps(result_data)}\n\n"  
+
+            elif importEnvMethod == 'environment':
+                with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.yml') as temp_env:
+                    temp_env.write(environment_content)
+                    env_path_temp = temp_env.name
+                
+                # 创建虚拟环境
+                yield f"data: {json.dumps({'status':'progress', 'step':'Creating conda environment from environment.yml', 'progress':15, 'type':env_type})}\n\n"
+                result = subprocess.run([CONDA_PATH, 'env', 'create',
+                                        '--file', env_path_temp,
+                                        '--prefix', env_path,
+                                        '-y'
+                                        ], capture_output=True, text=True)
+                
+                os.unlink(env_path_temp)
+
+                if result.returncode != 0:
+                    yield f"data: {json.dumps({'status':'error', 'message':f'Failed to create environment from environment.yml: {result.stderr}', 'type':env_type})}\n\n"      
+                    return      
+
+                yield f"data: {json.dumps({'status':'progress', 'step':'Environment created', 'progress':60, 'type':env_type})}\n\n"
+                            
+                # 获取环境详情
+                dependencies = get_packages(env_path)
+                version = get_python_version(env_path)
+
+                yield f"data: {json.dumps({'status':'progress', 'step':'Finalizing', 'progress':90, 'type':env_type})}\n\n"
+                time.sleep(0.5)
+
+                result_data = {
+                    'status': 'success',
+                    'path': env_path,
+                    'dependencies': dependencies,
+                    'pythonVersion': version,
+                    'type': env_type
+                }
+                yield f"data: {json.dumps(result_data)}\n\n" 
             else:
                 yield f"data: {json.dumps({'status':'error', 'message': 'Unsupported importEnvMethod', 'type':env_type})}\n\n"
         except Exception as e:

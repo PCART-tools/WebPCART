@@ -149,25 +149,35 @@
             <div class="modal-body"> 
                 <div class="form-group">
                     <label>Import Method:</label>
-                    <select class="form-control" disabled>
+                    <select v-model="importEnvMethod" class="form-control">
                         <option value="requirements">From requirements.txt</option>
+                        <option value="environment">From environment.yml</option>
                     </select>
                 </div>
 
-                <div class="form-group">
-                    <label>Python Version</label>
-                    <select v-model="pythonVersion" class="form-control">
-                        <option value="python3.8">Python 3.8</option>
-                        <option value="python3.9">Python 3.9</option>
-                        <option value="python3.10">Python 3.10</option>
-                        <option value="python3.11">Python 3.11</option>
-                        <option value="python3.12">Python 3.12</option>
-                    </select>
+                <div v-if="importEnvMethod === 'requirements'" class="import-method-section">
+                    <div>
+                        <label>Python Version</label>
+                        <select v-model="pythonVersion" class="form-control">
+                            <option value="python3.8">Python 3.8</option>
+                            <option value="python3.9">Python 3.9</option>
+                            <option value="python3.10">Python 3.10</option>
+                            <option value="python3.11">Python 3.11</option>
+                            <option value="python3.12">Python 3.12</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Requirements File</label>
+                        <input type="file" accept=".txt" @change="handleRequirementSelect" class="file-input"/>
+                    </div>
                 </div>
 
-                <div class="form-group">
-                    <label>Requirements File</label>
-                    <input type="file" accept=".txt" @change="handleRequirementSelect" class="file-input"/>
+                <div v-else-if="importEnvMethod == 'environment'" class="import-method-section">
+                    <div class="form-group">
+                        <label>Environment YML File</label>
+                        <input type="file" accept=".yml" @change="handleEnvironmentSelect" class="file-input"/>
+                    </div>
                 </div>
             </div>
 
@@ -190,7 +200,9 @@
                 <button
                     @click="createEnvironment"
                     class="confirm-button"
-                    :disabled="!requirementFile || (selectedEnvType === 'current' ? isCreatingCurrentEnv : isCreatingTargetEnv)">
+                    :disabled="(importEnvMethod === 'requirements' && !requirementFile) ||
+                                (importEnvMethod === 'environment' && !environmentFile) ||  
+                                (selectedEnvType === 'current' ? isCreatingCurrentEnv : isCreatingTargetEnv)">
                     {{(selectedEnvType === 'current' ? isCreatingCurrentEnv : isCreatingTargetEnv) ? 'Creating...' : 'Confirm'}}
                 </button>
             </div>
@@ -250,8 +262,10 @@ import {
 import { 
     showImportModal,
     selectedEnvType,
+    importEnvMethod,
     pythonVersion,
     requirementFile,
+    environmentFile,
     isCreatingCurrentEnv,
     currentCreatingEnvStep,
     currentEnvCreationProgress,
@@ -266,6 +280,7 @@ import {
     openImportEnvModal,
     closeImportEnvModal,
     handleRequirementSelect,
+    handleEnvironmentSelect,
     createEnvironment,
     openEnvDetailsModal,
     closeEnvDetailsModal
