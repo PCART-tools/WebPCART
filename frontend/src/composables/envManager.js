@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { showNotification } from './utils'
 
 // TODO：新增使用packages导入环境的方法
@@ -226,6 +226,7 @@ const showEnvDetailsModal = ref(false)
 const envDetails = ref({})
 const selectedEnvDetailsType = ref('')
 
+// 打开环境详情窗口
 export const openEnvDetailsModal = (envType) =>{
     selectedEnvDetailsType.value = envType;
     if(envType === 'current'){
@@ -236,14 +237,83 @@ export const openEnvDetailsModal = (envType) =>{
     showEnvDetailsModal.value = true;
 }
 
+// 关闭环境详情窗口
 export const closeEnvDetailsModal = () => {
     showEnvDetailsModal.value = false;
     selectedEnvDetailsType.value = '';
 }
 
+// 解析依赖
+function parseDependency(dep){
+    return dep.split('=')
+}
+
+// 获取版本升级的依赖库
+const upgradLibraries = computed(() => {
+    if(!currentEnv.value.dependencies || !targetEnv.value.dependencies){
+        return []
+    }
+
+    // 解析环境依赖
+    const currentDeps = new Map()
+    currentEnv.value.dependencies.forEach(dep => {
+        const [name, version] = dep.split('=')
+        if(name && version){
+            currentDeps.set(name.toLowerCase(), version)
+        }
+    })
+
+    const targetDeps = new Map()
+    targetEnv.value.dependencies.forEach(dep => {
+        const [name, version] = dep.split('=')
+        if(name && version){
+            targetDeps.set(name.toLowerCase(), version)
+        }
+    })
+
+    // 获取存在版本升级的依赖
+    const upgradDeps = []
+    
+    for(const [name, targetVersion] of targetDeps){
+        const currentVersion = currentDeps.get(name)
+        if(currentVersion && compareVersions(targetVersion, currentVersion) > 0){
+            upgradDeps.push({
+                name,
+                currentVersion,
+                targetVersion
+            })
+        }
+    }
+    return upgradDeps
+})
+
+// 版本比较
+function compareVersions(v1, v2){
+    const arr1 = v1.split('.').map(Number);
+    const arr2 = v2.split('.').map(Number);
+    const maxLength = Math.max(arr1.length, arr2.length);
+
+    for(let i = 0; i < maxLength; i++){
+        // 缺失的位视为0
+        const num1 = arr1[i] || 0;
+        const num2 = arr2[i] || 0;
+
+        if(num1 > num2) return 1;
+        if(num1 < num2) return -1;
+    }
+
+    return 0;
+}
+
+const environmentsReady = computed(() => {
+    return currentEnv.value.path && targetEnv.value.path
+})
+
 // 导出相关状态
 export {
     showImportModal,
+    currentEnv,
+    targetEnv,
     importEnvMethod,
     selectedEnvType,
     pythonVersion,
@@ -259,5 +329,7 @@ export {
     targetEnvCreationError,
     showEnvDetailsModal,
     envDetails,
-    selectedEnvDetailsType
+    selectedEnvDetailsType,
+    upgradLibraries,
+    environmentsReady,
 }

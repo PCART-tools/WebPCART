@@ -52,6 +52,12 @@
     text-overflow: ellipsis;
  }
 
+ .env-display-button.env-ready{
+    border-color: #28a745;
+    background-color: rgba(40, 167, 69, 0.05);
+}
+
+
  .env-display-button b{
     font-size: 15px;
  }
@@ -67,7 +73,7 @@
 
 /* 项目目标配置栏 */
 .app-target{
-    height: 100px;
+    height: 150px;
     width: 100%;
     display: flex;
     flex-direction: column;
@@ -82,6 +88,29 @@
     border: 1px solid #ccc;
     border-radius: 5px;
     width: 100%;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.target-select :disabled{
+    background-color: #f5f5f5;
+    color: #999;
+    cursor: not-allowed;
+}
+
+.library-change-info{
+    margin-top: 8px;
+    padding: 2px;
+    background-color: #e8f4f8;
+    border-radius: 4px;
+    font-size: 14px;
+    max-height: 60px;
+    overflow: hidden;
+}
+
+.library-change-info p{
+    margin: 0;
+    color: #333;
 }
 
  /* 运行命令栏 */

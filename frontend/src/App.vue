@@ -97,13 +97,13 @@
                 <div class="app-env">
                         <b>Import Virtual Environment</b>
                         <div class="env-section">
-                            <button class="env-display-button" @click="openEnvDetailsModal('current')">
+                            <button class="env-display-button" :class="{'env-ready': currentEnv.path}" @click="openEnvDetailsModal('current')">
                                 <b>currentEnv</b>
                             </button>
                             <button class="env-add-button" @click="openImportEnvModal('current')">import</button>
                         </div>
                         <div class="env-section">
-                            <button class="env-display-button" @click="openEnvDetailsModal('target')">
+                            <button class="env-display-button" :class="{'env-ready': targetEnv.path}" @click="openEnvDetailsModal('target')">
                                 <b>targetEnv</b>
                             </button>
                             <button class="env-add-button" @click="openImportEnvModal('target')">import</button>
@@ -113,11 +113,25 @@
                 <!-- 修复库配置栏 -->
                 <div class="app-target">
                     <b>Libraries to Fix</b>
-                    <select class="target-select">
-                        <option value="lib1">lib1</option>
-                        <option value="lib2">lib2</option>
-                        <option value="lib3">lib3</option>
+                    <select class="target-select"
+                            v-model="selectedLibrary"
+                            :disabled="!environmentsReady || upgradLibraries.length === 0">  
+                        <option value="" disabled v-if="!environmentsReady">
+                            Environment not ready
+                        </option>
+
+                        <option value="" disabled v-else-if="environmentsReady && upgradLibraries.length === 0">
+                            No version changes
+                        </option>
+
+                        <option v-for="lib in upgradLibraries"
+                                :key="lib.name"
+                                :value="lib.name">{{ lib.name }}</option>
                     </select>
+
+                    <div v-if="selectedLibrary" class="library-change-info">
+                        <p>{{ getSelectedLibraryInfo() }}</p>
+                    </div>
                 </div>
 
                 <!-- 运行命令配置栏 -->
@@ -261,6 +275,8 @@ import {
 
 import { 
     showImportModal,
+    currentEnv,
+    targetEnv,
     selectedEnvType,
     importEnvMethod,
     pythonVersion,
@@ -283,12 +299,13 @@ import {
     handleEnvironmentSelect,
     createEnvironment,
     openEnvDetailsModal,
-    closeEnvDetailsModal
+    closeEnvDetailsModal,
+    upgradLibraries,
+    environmentsReady
 } from './composables/envManager'
 
 import { showNotification } from './composables/utils'
 
-// ---项目栏功能---
 // 项目视图状态
 const projectView = ref('project')
 
@@ -297,6 +314,16 @@ const editorRef = ref(null)
 let editor = null
 let handleKeyDown = null
 const runCommand = ref('')
+
+// 修复库相关
+const selectedLibrary = ref('')
+const getSelectedLibraryInfo = () =>{
+    const lib = upgradLibraries.value.find(l => l.name === selectedLibrary.value)
+    if(lib){
+        return `${lib.name}: ${lib.currentVersion} -> ${lib.targetVersion}`
+    }
+    return ''
+}
 
 onMounted(() => { 
     // 创建编辑器实例
