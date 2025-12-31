@@ -157,3 +157,9 @@
     margin-top: 20px;
     align-self: center;
 }
+
+.run-button:disabled {
+    background: #cccccc;
+    cursor: not-allowed;
+    opacity: 0.6;
+}

@@ -1,7 +1,6 @@
 import { computed, ref } from 'vue'
 import { showNotification } from './utils'
 
-// TODO：新增使用packages导入环境的方法
 // 虚拟环境相关状态
 const showImportModal = ref(false)
 const importEnvMethod = ref('requirements')

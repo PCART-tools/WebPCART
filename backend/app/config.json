@@ -1,4 +1,6 @@
 {
   "conda_path": "/home/wyh/miniconda3/condabin/conda",
-  "env_base_path": "./data/venv"
+  "env_base_path": "./data/venv",
+  "fix_config_base_path": "./data/config",
+  "project_base_path": "./data/project"
 }

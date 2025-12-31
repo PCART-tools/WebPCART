@@ -114,7 +114,8 @@
                 <div class="app-target">
                     <b>Libraries to Fix</b>
                     <select class="target-select"
-                            v-model="selectedLibrary"
+                            @change="handleLibrarySelect"
+                            v-model="handleSelectedLibrary"
                             :disabled="!environmentsReady || upgradLibraries.length === 0">  
                         <option value="" disabled v-if="!environmentsReady">
                             Environment not ready
@@ -147,7 +148,11 @@
                     </div>   
                 </div>
 
-                <button class="run-button">Run</button>     
+                <button class="run-button" 
+                        :disabled="!project || !selectedLibrary || !runCommand"
+                        @click="runFixCommand">
+                    Run
+                </button>     
             </div>
         </div>
     </div>
@@ -254,7 +259,7 @@
 </template>
 
 <script setup>
-import {ref, onMounted, onUnmounted} from 'vue'
+import {ref, onMounted, onUnmounted, computed} from 'vue'
 import * as monaco from 'monaco-editor'
 
 // 导入拆分的模块
@@ -302,7 +307,7 @@ import {
     closeEnvDetailsModal,
     upgradLibraries,
     environmentsReady
-} from './composables/envManager'
+} from './composables/configManager'
 
 import { showNotification } from './composables/utils'
 
@@ -316,13 +321,71 @@ let handleKeyDown = null
 const runCommand = ref('')
 
 // 修复库相关
-const selectedLibrary = ref('')
+const selectedLibrary = ref(null)
+
+const handleSelectedLibrary = computed({
+    get(){
+        return selectedLibrary.value ? selectedLibrary.value.name : ''
+    },
+    set(value){
+        const selectedLib = upgradLibraries.value.find(l => l.name === value)
+
+        if(selectedLib){
+            selectedLibrary.value = {
+                name: selectedLib.name,
+                currentVersion: selectedLib.currentVersion,
+                targetVersion: selectedLib.targetVersion
+            };
+    }else{
+        selectedLibrary.value = null;
+    }
+    }
+})
+
 const getSelectedLibraryInfo = () =>{
-    const lib = upgradLibraries.value.find(l => l.name === selectedLibrary.value)
-    if(lib){
-        return `${lib.name}: ${lib.currentVersion} -> ${lib.targetVersion}`
+    if(selectedLibrary.value){
+        return `${selectedLibrary.value.name}: ${selectedLibrary.value.currentVersion} -> ${selectedLibrary.value.targetVersion}`
     }
     return ''
+}
+
+// 运行修复命令
+const runFixCommand = async() => {
+    const configData = {
+        projectName: project.value,
+        libName: selectedLibrary.value.name,
+        currentVersion: selectedLibrary.value.currentVersion,
+        targetVersion: selectedLibrary.value.targetVersion,
+        runCommand: runCommand.value
+    }
+
+    try{
+        const response = await fetch('http://localhost:5000/fix/run_fix',{
+            method:'POST',
+            'headers':{
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(configData)
+        })
+
+        if(response.ok){
+            const result = await response.json();
+
+            if(result.status === 'success'){
+                showNotification('Fix executed successfully', 'success');
+            }else{
+                showNotification('Failed to fix' + result.message, 'error');
+                throw new Error(`Failed to fix: ${result.message}`);      
+            }
+        }else{
+            const result = await response.json();
+            showNotification('Failed to fix' + result.error, 'error');
+            throw new Error(`Failed to fix: ${result.error}`); 
+        }  
+    }catch(error){
+        console.error('Failed to fix', error);
+        showNotification('Failed to fix:' + error.message, 'error');
+    }
 }
 
 onMounted(() => { 
