@@ -1,15 +1,15 @@
 # WebPCART
 
-## 项目概述
+## Project Overview
 
-WebPCART 是一个基于PCART工具，构建的Python程序API参数兼容性问题在线分析平台，实现了Python程序API参数兼容性问题的可视化分析、检测与修复。
+WebPCART is an online analysis platform for Python program API parameter compatiiblity issues, built based on PCART tool.It enables visual analysis, detection, and repair of API parameter compatibility issues in Python programs
 
-PCART项目地址：https://github.com/PCART-tools/PCART
+PCART project address：https://github.com/PCART-tools/PCART
 
-## 技术栈
+## Technology Stack
 
-- **前端**: JavaScript, Vue.js
-- **后端**: Python, Flask
-- **构建工具**: npm
-- **开发工具**: Git
+- **Frontend**: JavaScript, Vue.js
+- **Backend**: Python, Flask
+- **Build Tool**: npm
+- **Development Tool**: Git
 

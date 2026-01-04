@@ -1,0 +1,50 @@
+/* 主容器 */
+.app-container{ 
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding-top: 60px;
+    overflow: hidden;
+}
+
+/* 功能栏 */
+.function-bar{
+    height: 60px;
+    border-bottom: 1px solid #e0e0e0;
+    background: #f9f8f8ff;
+    padding-left: 10px;
+    font-weight: bold;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-right: 10px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+}
+
+.function-buttons button{
+    margin-left: 10px;
+    border: none;
+    background: none;
+    padding: 5px 10px;
+    cursor:pointer;
+    font-size: 20px;
+}
+
+.app-main{
+    display: flex;
+    min-height: calc(100vh - 60px);
+    width: 100%;
+}
+
+/* 中心部分 */
+.app-middle{
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #e0e0e0;
+}
