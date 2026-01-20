@@ -139,12 +139,13 @@
                 <div class="app-command"> 
                     <b>Run Command</b>
                     <div class="command-container">
-                        <input 
-                            type="text"
-                            class="command-input"
-                            placeholder="Enter project run command"
-                            v-model="runCommand"
-                        />
+                        <button
+                            class="command-select-button"
+                            @click="openCommandModal(fileTree)"
+                            :disabled="!project"
+                        >
+                            {{ runCommand || 'Import run command...' }}
+                        </button>
                     </div>   
                 </div>
 
@@ -256,6 +257,16 @@
             </div>
         </div>
     </div>
+
+    <CommandSelectionModal
+        :show-command-modal="showCommandModal"
+        :project="fileTree"
+        :python-files="pythonFiles"
+        :selected-python-file="selectedPythonFile"
+        :additional-args="additionalArgs"
+        @closeCommandModal="closeCommandModal"
+        @saveCommand="saveCommand"
+    />
 </template>
 
 <script setup>
@@ -306,8 +317,19 @@ import {
     openEnvDetailsModal,
     closeEnvDetailsModal,
     upgradLibraries,
-    environmentsReady
+    environmentsReady,
+    runCommand,
+    runFilePath,
+    showCommandModal,
+    pythonFiles,
+    selectedPythonFile,
+    additionalArgs,
+    openCommandModal,
+    closeCommandModal,
+    saveCommand,
 } from './composables/configManager'
+
+import CommandSelectionModal from './components/RunCommandModal.vue';
 
 import { showNotification } from './composables/utils'
 
@@ -318,7 +340,6 @@ const projectView = ref('project')
 const editorRef = ref(null)
 let editor = null
 let handleKeyDown = null
-const runCommand = ref('')
 
 // 修复库相关
 const selectedLibrary = ref(null)
@@ -356,7 +377,8 @@ const runFixCommand = async() => {
         libName: selectedLibrary.value.name,
         currentVersion: selectedLibrary.value.currentVersion,
         targetVersion: selectedLibrary.value.targetVersion,
-        runCommand: runCommand.value
+        runCommand: runCommand.value,
+        runFilePath: runFilePath.value
     }
 
     try{

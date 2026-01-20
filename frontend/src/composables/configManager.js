@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, reactive } from 'vue'
 import { showNotification } from './utils'
 
 // 虚拟环境相关状态
@@ -308,27 +308,89 @@ const environmentsReady = computed(() => {
     return currentEnv.value.path && targetEnv.value.path
 })
 
+const runCommand = ref('')
+const runFilePath = ref('')
+const showCommandModal = ref(false)
+const pythonFiles = ref([])
+const selectedPythonFile = ref('')
+const additionalArgs = ref('')
+
+// 提取 Python 文件的函数
+const extractPythonFiles = (treeNode, currentPath = '') => {
+  let files = []
+  
+  if (treeNode.type === 'file' && treeNode.name.endsWith('.py')) {
+    files.push(currentPath ? `${currentPath}/${treeNode.name}` : treeNode.name)
+  } else if (treeNode.children) {
+    for (const child of treeNode.children) {
+      const childPath = currentPath ? `${currentPath}/${treeNode.name}` : treeNode.name
+      files = files.concat(extractPythonFiles(child, childPath))
+    }
+  }
+  
+  return files
+}
+
+// 更新项目时提取 Python 文件
+const updatePythonFiles = (fileTree) => {
+  if (fileTree) {
+    pythonFiles.value = extractPythonFiles(fileTree, '')
+  } else {
+    pythonFiles.value = []
+  }
+}
+
+// 打开命令导入窗口
+const openCommandModal = (fileTree) => {
+  if (fileTree) {
+    updatePythonFiles(fileTree)
+    showCommandModal.value = true
+  }
+}
+
+// 关闭命令导入窗口
+const closeCommandModal = () => {
+  showCommandModal.value = false
+}
+
+// 保存命令
+const saveCommand = (command, filePath) => {
+  runCommand.value = command;
+  runFilePath.value = filePath;
+  closeCommandModal();
+}
+
 // 导出相关状态
 export {
-    showImportModal,
-    currentEnv,
-    targetEnv,
-    importEnvMethod,
-    selectedEnvType,
-    pythonVersion,
-    requirementFile,
-    environmentFile,
-    isCreatingCurrentEnv,
-    currentCreatingEnvStep,
-    currentEnvCreationProgress,
-    currentEnvCreationError,
-    isCreatingTargetEnv,
-    targetCreatingEnvStep,
-    targetEnvCreationProgress,
-    targetEnvCreationError,
-    showEnvDetailsModal,
-    envDetails,
-    selectedEnvDetailsType,
-    upgradLibraries,
-    environmentsReady,
+  showImportModal,
+  currentEnv,
+  targetEnv,
+  selectedEnvType,
+  importEnvMethod,
+  pythonVersion,
+  requirementFile,
+  environmentFile,
+  isCreatingCurrentEnv,
+  currentCreatingEnvStep,
+  currentEnvCreationProgress,
+  currentEnvCreationError,
+  isCreatingTargetEnv,
+  targetCreatingEnvStep,
+  targetEnvCreationProgress,
+  targetEnvCreationError,
+  showEnvDetailsModal,
+  envDetails,
+  selectedEnvDetailsType,
+  upgradLibraries,
+  environmentsReady, 
+  runCommand,
+  runFilePath,
+  showCommandModal,
+  pythonFiles,
+  selectedPythonFile,
+  additionalArgs,
+  openCommandModal,
+  closeCommandModal,
+  saveCommand,
+  updatePythonFiles
 }

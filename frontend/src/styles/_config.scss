@@ -129,22 +129,27 @@
     width: 100%;
  }
 
- .command-input{ 
-    width: 100%;
-    padding: 10px 15px;
-    border: 1px solid #ccc;
-    font-size: 16px;
-    outline: none;
- }
-
- .command-input:focus{
-    border-color: #50f9ffff;
-    box-shadow: 0 0 2px rgba(80, 249, 255, 0.2);
- }
-
- .command-input::placeholder{
+.command-select-button {
+  width: 100%;
+  padding: 10px 15px;
+  border: 1px solid #ccc;
+  font-size: 16px;
+  outline: none;
+  text-align: left;
+  cursor: pointer;
+  background: #fff;
+  border-radius: 5px;
+  
+  &:hover {
+    background-color: #f5f5f5;
+  }
+  
+  &:disabled {
+    background-color: #f0f0f0;
     color: #999;
- }
+    cursor: not-allowed;
+  }
+}
 
 .run-button{ 
     padding: 6px 5px;

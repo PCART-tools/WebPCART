@@ -15,7 +15,7 @@ ENV_BASE_PATH = os.path.join(os.path.dirname(__file__), '..', '..', config['env_
 PROJECT_BASE_PATH = os.path.join(os.path.dirname(__file__), '..', '..', config['project_base_path'])
 
 # 生成配置文件
-def generate_fix_config(projectName, selectedLibrary, fix_command):
+def generate_fix_config(projectName, selectedLibrary, fix_command, run_file_path):
     current_env = os.path.join(ENV_BASE_PATH, 'current')
     target_env = os.path.join(ENV_BASE_PATH, 'target')
     project = os.path.join(PROJECT_BASE_PATH, projectName)
@@ -23,7 +23,7 @@ def generate_fix_config(projectName, selectedLibrary, fix_command):
     config_content = {
         'projPath': project,
         'runCommand': fix_command,
-        'runFilePath': "",
+        'runFilePath': run_file_path,
         'libName': selectedLibrary['name'],
         'currentVersion': selectedLibrary['currentVersion'],
         'targetVersion': selectedLibrary['targetVersion'],
@@ -51,8 +51,9 @@ def run_fix():
             'targetVersion': data['targetVersion']
         }
         run_command = data['runCommand']
+        run_file_path = data['runFilePath']
 
-        config_file_path = generate_fix_config(project_name, selected_library, run_command)
+        config_file_path = generate_fix_config(project_name, selected_library, run_command, run_file_path)
 
         return jsonify({
             'status': 'success',
