@@ -171,7 +171,7 @@
                     <label>Import Method:</label>
                     <select v-model="importEnvMethod" class="form-control">
                         <option value="requirements">From requirements.txt</option>
-                        <option value="environment">From environment.yml</option>
+                        <option value="condapack">From condapack</option>
                     </select>
                 </div>
 
@@ -193,10 +193,10 @@
                     </div>
                 </div>
 
-                <div v-else-if="importEnvMethod == 'environment'" class="import-method-section">
+                <div v-else-if="importEnvMethod == 'condapack'" class="import-method-section">
                     <div class="form-group">
-                        <label>Environment YML File</label>
-                        <input type="file" accept=".yml" @change="handleEnvironmentSelect" class="file-input"/>
+                        <label>Conda Pack File</label>
+                        <input type="file" accept=".tar,.tar.gz,.tgz" @change="handleCondapackSelect" class="file-input"/>
                     </div>
                 </div>
             </div>
@@ -221,7 +221,7 @@
                     @click="createEnvironment"
                     class="confirm-button"
                     :disabled="(importEnvMethod === 'requirements' && !requirementFile) ||
-                                (importEnvMethod === 'environment' && !environmentFile) ||  
+                                (importEnvMethod === 'condapack' && !condapackFile) ||  
                                 (selectedEnvType === 'current' ? isCreatingCurrentEnv : isCreatingTargetEnv)">
                     {{(selectedEnvType === 'current' ? isCreatingCurrentEnv : isCreatingTargetEnv) ? 'Creating...' : 'Confirm'}}
                 </button>
@@ -297,7 +297,7 @@ import {
     importEnvMethod,
     pythonVersion,
     requirementFile,
-    environmentFile,
+    condapackFile,
     isCreatingCurrentEnv,
     currentCreatingEnvStep,
     currentEnvCreationProgress,
@@ -312,7 +312,7 @@ import {
     openImportEnvModal,
     closeImportEnvModal,
     handleRequirementSelect,
-    handleEnvironmentSelect,
+    handleCondapackSelect,
     createEnvironment,
     openEnvDetailsModal,
     closeEnvDetailsModal,

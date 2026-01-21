@@ -9,7 +9,7 @@ const selectedEnvType = ref(null)
 const pythonVersion = ref('python3.12')
 const requirementFile = ref(null)
 
-const environmentFile = ref(null)
+const condapackFile = ref(null)
 
 const isCreatingCurrentEnv = ref(false)
 const currentCreatingEnvStep = ref('Initializing')
@@ -36,7 +36,7 @@ export const openImportEnvModal = (envType) => {
     selectedEnvType.value = envType;
     showImportModal.value = true;
     requirementFile.value = null;
-    environmentFile.value = null;
+    condapackFile.value = null;
 }
 
 // 关闭导入环境窗口
@@ -59,14 +59,14 @@ export const handleRequirementSelect = (e) => {
     }
 }
 
-export const handleEnvironmentSelect = (e) => {
+export const handleCondapackSelect = (e) => {
     const file = e.target.files[0];
 
-    if(importEnvMethod.value === 'environment'){
-        if(file && file.name.toLowerCase().endsWith('.yml')){
-            environmentFile.value = file;
+    if(importEnvMethod.value === 'condapack'){
+        if(file && (file.name.toLowerCase().endsWith('.tar') || file.name.toLowerCase().endsWith('.tar.gz') || file.name.toLowerCase().endsWith('.tgz'))){
+            condapackFile.value = file;
         }else{
-            showNotification('Please select a valid .yml file', 'warning');
+            showNotification('Please select a valid conda pack file(.tar, .tar.gz, or .tgz)', 'warning');
             e.target.value = '';
         }
     }
@@ -79,9 +79,9 @@ export const createEnvironment = async() => {
             showNotification('Please select a requirements.txt file', 'warning');
             return;
         }
-    }else if(importEnvMethod.value === 'environment'){
-        if(!environmentFile.value){
-            showNotification('Please select a environment.yml file', 'warning');
+    }else if(importEnvMethod.value === 'condapack'){
+        if(!condapackFile.value){
+            showNotification('Please select a conda pack file', 'warning');
             return;
         }
     }
@@ -107,8 +107,8 @@ export const createEnvironment = async() => {
 
         if(importEnvMethod.value === 'requirements'){
             formData.append('requirements', requirementFile.value);
-        }else if(importEnvMethod.value === 'environment'){
-            formData.append('environment', environmentFile.value);
+        }else if(importEnvMethod.value === 'condapack'){
+            formData.append('condapack', condapackFile.value);
         }
 
         const response = await fetch('http://localhost:5000/venv/create', {
@@ -369,7 +369,7 @@ export {
   importEnvMethod,
   pythonVersion,
   requirementFile,
-  environmentFile,
+  condapackFile,
   isCreatingCurrentEnv,
   currentCreatingEnvStep,
   currentEnvCreationProgress,
