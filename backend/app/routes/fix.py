@@ -9,10 +9,10 @@ config_path = os.path.join(os.path.dirname(__file__), '..', 'config.json')
 with open(config_path, 'r', encoding='utf-8') as f:
     config = json.load(f)
 
-CONFIG_BASE_PATH = os.path.join(os.path.dirname(__file__), '..', '..', config['fix_config_base_path'])
+CONFIG_BASE_PATH = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..', config['fix_config_base_path']))
 
-ENV_BASE_PATH = os.path.join(os.path.dirname(__file__), '..', '..', config['env_base_path'])
-PROJECT_BASE_PATH = os.path.join(os.path.dirname(__file__), '..', '..', config['project_base_path'])
+ENV_BASE_PATH = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..', config['env_base_path']))
+PROJECT_BASE_PATH = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..', config['project_base_path']))
 
 # 生成配置文件
 def generate_fix_config(projectName, selectedLibrary, fix_command, run_file_path):

@@ -3,7 +3,7 @@ import { showNotification } from './utils'
 
 // 虚拟环境相关状态
 const showImportModal = ref(false)
-const importEnvMethod = ref('requirements')
+const importEnvMethod = ref('condapack')
 const selectedEnvType = ref(null)
 
 const pythonVersion = ref('python3.12')

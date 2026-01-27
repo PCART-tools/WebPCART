@@ -163,13 +163,6 @@ def create_venv():
                     yield f"data: {json.dumps({'status':'error', 'message': f'Failed to extract conda pack: {result.stderr}', 'type':env_type})}\n\n"
                     return   
 
-                # # 重命名环境
-                # extracted_dirs = os.listdir(os.path.dirname(env_path))
-                # if len(extracted_dirs) == 1:
-                #     extracted_path = os.path.join(os.path.dirname(env_path), extracted_dirs[0])
-                #     if os.path.isdir(extracted_path):
-                #         os.rename(extracted_path, env_path)   
-
                 # 初始化虚拟环境
                 yield f"data: {json.dumps({'status':'progress', 'step':'Reinitializing conda environment', 'progress':60, 'type':env_type})}\n\n"
                 result = subprocess.run([CONDA_PATH, 'init', 'bash'], capture_output=True, text=True)
