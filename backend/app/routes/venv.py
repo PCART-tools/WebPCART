@@ -21,7 +21,6 @@ with open(config_path, 'r', encoding='utf-8') as f:
 
 ENV_BASE_PATH = os.path.join(os.path.dirname(__file__), '..', '..', config['env_base_path'])
 
-print(ENV_BASE_PATH)
 if not os.path.exists(ENV_BASE_PATH):
     os.makedirs(ENV_BASE_PATH)
 

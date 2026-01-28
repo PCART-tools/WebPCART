@@ -168,3 +168,18 @@
     cursor: not-allowed;
     opacity: 0.6;
 }
+
+.fix-progress-container {
+    margin-top: 15px;
+    padding: 10px;
+    background-color: #e3f2fd;
+    border-radius: 5px;
+    border: 1px solid #e0e0e0;
+    min-width: 100%;
+}
+
+.fix-progress-container .progress-label {
+    margin-bottom: 5px;
+    font-size: 14px;
+    text-align: center;
+}

@@ -76,17 +76,11 @@
                 
             </div>
 
-            <div class="app-middle">
+            <div class="app-code">
                 <!-- 代码编辑栏 -->
-                <div class="app-code">
-                    <div class="editor-container" ref="editorRef" :class="{disabled: !currentFilePath}" v-show="currentFilePath"></div>
-                    <div v-if="!currentFilePath" class="editor-placeholder">
-                        <b>choose a file(.py / .txt) to edit</b>
-                    </div>
-                </div>
-                
-                <div class="app-terminal">
-                    <b>Terminal</b>
+                <div class="editor-container" ref="editorRef" :class="{disabled: !currentFilePath}" v-show="currentFilePath"></div>
+                <div v-if="!currentFilePath" class="editor-placeholder">
+                    <b>choose a file(.py / .txt) to edit</b>
                 </div>
             </div>
 
@@ -152,8 +146,23 @@
                 <button class="run-button" 
                         :disabled="!project || !selectedLibrary || !runCommand"
                         @click="runFixCommand">
-                    Run
-                </button>     
+                    {{ isRunningFix ? 'Running...' : 'Run' }}
+                </button>    
+                
+                <div v-if="isRunningFix" class="fix-progress-container">
+                    <div class="progress-label">
+                        {{ fixProgressStep }}
+                    </div>
+                    <div class="progress-bar-background">
+                        <div class="progress-bar-fill"
+                         :style="{width: fixProgress + '%'}"></div>
+                    </div>
+                    <div class="progress-percentage">{{ fixProgress }}%</div>
+                </div>
+
+                <div v-if="fixError" class="error-message">
+                    {{ fixError }}
+                </div>
             </div>
         </div>
     </div>
@@ -344,6 +353,13 @@ let handleKeyDown = null
 // 修复库相关
 const selectedLibrary = ref(null)
 
+// 修复进度相关
+const isRunningFix = ref(false)
+const fixProgressStep = ref('Initializing')
+const fixProgress = ref(0)
+const fixError = ref('')
+
+
 const handleSelectedLibrary = computed({
     get(){
         return selectedLibrary.value ? selectedLibrary.value.name : ''
@@ -381,6 +397,11 @@ const runFixCommand = async() => {
         runFilePath: runFilePath.value
     }
 
+    isRunningFix.value = true;
+    fixError.value = '';
+    fixProgress.value = 0;
+    fixProgressStep.value = 'Starting fix process';
+
     try{
         const response = await fetch('http://localhost:5000/fix/run_fix',{
             method:'POST',
@@ -388,25 +409,54 @@ const runFixCommand = async() => {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(configData)
-        })
+        });
 
-        if(response.ok){
-            const result = await response.json();
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
 
-            if(result.status === 'success'){
-                showNotification('Fix executed successfully', 'success');
-            }else{
-                showNotification('Failed to fix' + result.message, 'error');
-                throw new Error(`Failed to fix: ${result.message}`);      
+        // 持续获取修复进度
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n');
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.substring(6));
+
+                        if (data.status === 'progress') {
+                            fixProgressStep.value = data.step;
+                            fixProgress.value = data.progress;
+                        } else if (data.status === 'error') {
+                            fixError.value = data.message.replace(/\u001b\[[0-9;]*m/g, '');  // 去除ANSI控制字符
+                            isRunningFix.value = false;
+                            showNotification(`Fix failed: ${data.message}`, 'error');
+                            return;
+                        } else if (data.status === 'success') {
+                            fixProgress.value = 100;
+                            fixProgressStep.value = data.message;
+
+                            setTimeout(() => {
+                                showNotification('Fix completed successfully', 'success');
+                            }, 1000);
+
+                            isRunningFix.value = false;
+                            return;
+                        }
+                    } catch (e) {
+                        console.error('Error parsing fix progress JSON:', e);
+                    }
+                }
             }
-        }else{
-            const result = await response.json();
-            showNotification('Failed to fix' + result.error, 'error');
-            throw new Error(`Failed to fix: ${result.error}`); 
-        }  
+        }
     }catch(error){
-        console.error('Failed to fix', error);
-        showNotification('Failed to fix:' + error.message, 'error');
+        fixError.value = error.message;
+        isRunningFix.value = false;
+        console.error('Failed to run fix with progress', error);
+        showNotification('Failed to run fix:' + error.message, 'error');
     }
 }
 
