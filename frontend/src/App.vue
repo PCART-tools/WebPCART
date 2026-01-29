@@ -31,11 +31,6 @@
                         :class="{active: projectView === 'intermediate'}"
                         @click="projectView = 'intermediate'"
                     >Intermediate</button>
-                    <button
-                        class="nav-button"
-                        :class="{active: projectView === 'fixresult'}"
-                        @click="projectView = 'fixresult'"
-                    >FixResult</button>
                 </div>
 
                 <div v-show="projectView === 'project'" class="project-content">
@@ -53,7 +48,8 @@
                         </div>
                         <div class="progress-percentage">{{ uploadProgress }} %</div>
                     </div>
-                    <div v-if="!isUploading && project" class="current-project">
+
+                    <div v-if="!isUploading && project" class="project">
                         <div class="project-header">
                             <span class="project-path">{{project}}</span>
                             <button class="downloadProject" title="Download Project" @click="downloadProject">
@@ -61,19 +57,26 @@
                             </button>
                         </div>
                         <div v-if="fileTree" class="file-tree">
-                            <tree-view :tree-data="fileTree" :project-name="project"/>
-                        </div>
+                            <tree-view :tree-data="fileTree" :project-name="project" project-type="original"/>
+                        </div> 
                     </div>  
+
+                    <div v-if="!isUploading && fixedProject" class="project">
+                        <div class="project-header">
+                            <span class="project-path">{{project}} -fixed</span>
+                            <button class="downloadProject" title="Download Project" @click="downloadProject('fixed')">
+                                <i class="fas fa-download"></i>
+                            </button>
+                        </div>
+                        <div v-if="fixedFileTree" class="file-tree">
+                            <tree-view :tree-data="fixedFileTree" :project-name="fixedProject" project-type="fixed"/>
+                        </div> 
+                    </div> 
                 </div>
 
                 <div v-show="projectView === 'intermediate'" class="intermediate-content">
                     <b>Run fix command to get results</b>
-                </div>
-
-                <div v-show="projectView === 'fixresult'" class="result-content">
-                    <b>Run fix command to get results</b>
-                </div>
-                
+                </div>               
             </div>
 
             <div class="app-code">
@@ -287,6 +290,8 @@ import TreeView from './components/TreeView.vue'
 import { 
     project, 
     fileTree, 
+    fixedProject,
+    fixedFileTree,
     uploadProgress, 
     isUploading, 
     currentFilePath, 
@@ -295,7 +300,8 @@ import {
     selectFolder,
     saveFile,
     loadCurrentProject,
-    downloadProject
+    downloadProject,
+    setFixedProject,
 } from './composables/projectManager'
 
 import { 
@@ -438,6 +444,8 @@ const runFixCommand = async() => {
                         } else if (data.status === 'success') {
                             fixProgress.value = 100;
                             fixProgressStep.value = data.message;
+
+                            await setFixedProject(project.value)
 
                             setTimeout(() => {
                                 showNotification('Fix completed successfully', 'success');

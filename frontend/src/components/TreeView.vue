@@ -6,6 +6,7 @@
             :node="node"
             :project-name="projectName"
             :base-path="''"
+            :project-type="projectType || 'original'"
         />
     </ul>
 </template>
@@ -13,5 +14,5 @@
 <script setup>
 import TreeNode from './TreeNode.vue'
 
-defineProps(['treeData', 'projectName'])
+defineProps(['treeData', 'projectName', 'projectType'])
 </script>

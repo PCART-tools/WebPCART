@@ -6,11 +6,19 @@ from io import BytesIO
 
 project_bp = Blueprint('project', __name__)
 
-PROJECTS_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'projects')
-project = None
+# 读取配置
+config_path = os.path.join(os.path.dirname(__file__), '..', 'config.json')
+with open(config_path, 'r', encoding='utf-8') as f:
+    config = json.load(f)
+
+PROJECTS_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..', config['project_base_path']))
 
 if not os.path.exists(PROJECTS_ROOT):
     os.makedirs(PROJECTS_ROOT)
+
+FIXED_PROJECTS_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..', config['new_project_base_path']))
+
+project = None
 
 # 获取项目
 @project_bp.route('/project', methods=['GET'])
@@ -106,6 +114,7 @@ def upload_batch():
 def get_project_tree():
     data = request.get_json()
     project_name = data.get('name')
+    project_type = data.get('type')
 
     if not project_name:
         return jsonify({
@@ -113,7 +122,10 @@ def get_project_tree():
             "status": "error"
         }), 400
     
-    root_path = os.path.join(PROJECTS_ROOT, project_name)
+    if project_type == 'original':
+        root_path = os.path.join(PROJECTS_ROOT, project_name)
+    elif project_type == 'fixed':
+        root_path = os.path.join(FIXED_PROJECTS_ROOT, project_name)
 
     if not os.path.exists(root_path):
         return jsonify({
@@ -159,6 +171,7 @@ def download_file():
         project_name = data.get('projectName')
         path = data.get('path')
         item_type = data.get('type')
+        project_type = data.get('projectType')
 
         if not project_name or not path:
             return jsonify({
@@ -166,7 +179,11 @@ def download_file():
                 "status": "error"
             }), 400
         
-        project_dir = os.path.join(PROJECTS_ROOT, project_name)
+        if project_type == 'fixed':
+            project_dir = os.path.join(FIXED_PROJECTS_ROOT, project_name)
+        else:
+            project_dir = os.path.join(PROJECTS_ROOT, project_name)
+        
         target_path = os.path.join(project_dir, path)
 
         if not os.path.exists(target_path):
@@ -208,6 +225,7 @@ def get_file_content():
         data = request.get_json()
         project_name = data.get('projectName')
         file_path = data.get('filePath')
+        project_type = data.get('projectType')
         
         if not project_name or not file_path:
             return jsonify({
@@ -215,7 +233,11 @@ def get_file_content():
                 "status": "error"
             }), 400
         
-        project_dir = os.path.join(PROJECTS_ROOT, project_name)
+        if project_type == 'fixed':
+            project_dir = os.path.join(FIXED_PROJECTS_ROOT, project_name)
+        else:
+            project_dir = os.path.join(PROJECTS_ROOT, project_name)
+        
         target_path = os.path.join(project_dir, file_path)
 
         if not os.path.exists(target_path):
@@ -250,6 +272,7 @@ def save_file():
         project_name = data.get('projectName')
         file_path = data.get('filePath')
         content = data.get('content')
+        project_type = data.get('projectType')
 
         if not project_name or not file_path:
             return jsonify({
@@ -257,7 +280,11 @@ def save_file():
                 "status": "error"
             }), 400
         
-        project_dir = os.path.join(PROJECTS_ROOT, project_name)
+        if project_type == 'fixed':
+            project_dir = os.path.join(FIXED_PROJECTS_ROOT, project_name)
+        else:
+            project_dir = os.path.join(PROJECTS_ROOT, project_name)
+            
         target_path = os.path.join(project_dir, file_path)
         target_dir = os.path.dirname(target_path)
         if not os.path.exists(target_dir):

@@ -24,10 +24,13 @@
                 :node="child"
                 :project-name="projectName"
                 :base-path="getCurrentPath()"
+                :project-type="projectType"
             />
         </ul>
     </li>
 </template>
+
+//TODO 修改后项目的代码修改保存，添加新项目后清空修复后项目文件，两个项目之间的隔离样式
 
 <script setup>
 import { ref } from 'vue'
@@ -37,7 +40,7 @@ import { saveFile } from '../composables/projectManager'
 // 从projectManager导入状态
 import { currentFilePath, isContentModified } from '../composables/projectManager'
 
-const props = defineProps(['node', 'projectName', 'basePath'])
+const props = defineProps(['node', 'projectName', 'basePath', 'projectType'])
 
 const isExpanded = ref(false)
 
@@ -92,7 +95,8 @@ const downloadItem = async () => {   // 下载文件
             body: JSON.stringify({
                 projectName: props.projectName,
                 path: fullPath,
-                type: props.node.type
+                type: props.node.type,
+                projectType: props.projectType
             })
         });
 
@@ -144,7 +148,8 @@ const loadFileContent = async () => {    // 加载文件内容
             },
             body: JSON.stringify({
                 projectName: props.projectName,
-                filePath: fullPath
+                filePath: fullPath,
+                projectType: props.projectType
             })
         });
 

@@ -4,6 +4,10 @@ import { showNotification } from './utils'
 // 项目管理相关状态
 const project = ref(null)
 const fileTree = ref(null)
+
+const fixedProject = ref(null)
+const fixedFileTree = ref(null)
+
 const uploadProgress = ref(0)
 const isUploading = ref(false)
 const totalBatches = ref(0)
@@ -111,7 +115,7 @@ export const uploadFiles = async(projectName, files) => {
 }
 
 // 保存已修改文件
-export const saveFile = async() => {
+export const saveFile = async(projectType = 'original') => {
     try{
         const currentContent = window.editor.getValue();
 
@@ -123,7 +127,8 @@ export const saveFile = async() => {
             body: JSON.stringify({
                 projectName: project.value,
                 filePath: currentFilePath.value,
-                content: currentContent
+                content: currentContent,
+                projectType: projectType
             })
         });
 
@@ -165,19 +170,24 @@ export const setProject = async(path) => {
 }
 
 // 加载项目树
-export const loadProjectTree = async(projectName) => {
+export const loadProjectTree = async(projectName, type = 'original') => {
     try{
         const response = await fetch('http://localhost:5000/project/tree', {
             method: 'POST',
             headers:{
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({name: projectName})
+            body: JSON.stringify({name: projectName, type: type})
         });
 
         const result = await response.json();
         if(result.status === 'success'){
-            fileTree.value = result.tree;
+            if(type == 'original'){
+                fileTree.value = result.tree;
+            }else if(type == 'fixed'){
+                fixedFileTree.value = result.tree;
+            }
+            
             if(!currentFilePath.value && window.editor){
                 window.editor.updateOptions({readOnly: true});
             }
@@ -205,7 +215,7 @@ export const loadCurrentProject = async() => {
     }
 }
 
-export const downloadProject = async() => {
+export const downloadProject = async(projectType = 'original') => {
     try{
         // 检查是否有未保存的修改
         if(isContentModified.value && currentFilePath.value){
@@ -223,7 +233,8 @@ export const downloadProject = async() => {
             body: JSON.stringify({
                 projectName: project.value,
                 path: '.',
-                type: 'project'
+                type: 'project',
+                projectType: projectType
             })
         });
 
@@ -248,10 +259,29 @@ export const downloadProject = async() => {
     }
 }
 
+// 设置修复后的项目
+export const setFixedProject = async(path) => {
+    try{
+        fixedProject.value = path;
+        await loadProjectTree(path, 'fixed');
+    }catch(error){
+        console.error('Error setting fixed project:', error);
+        showNotification('Failed to set fixed project', 'error');
+    }
+}
+
+// 清空修复后的项目数据
+export const clearFixedProject = () => {
+    fixedProject.value = null;
+    fixedFileTree.value = null;
+}
+
 // 导出相关状态
 export {
     project,
     fileTree,
+    fixedProject,
+    fixedFileTree,
     uploadProgress,
     isUploading,
     totalBatches,
