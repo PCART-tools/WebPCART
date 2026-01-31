@@ -4,23 +4,14 @@ import json
 import zipfile
 from io import BytesIO
 import logging
+from .common import get_logger, get_project_base_path, get_fixed_project_base_path
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
+logger = get_logger('project')
 project_bp = Blueprint('project', __name__)
 
 # 读取配置
-config_path = os.path.join(os.path.dirname(__file__), '..', 'config.json')
-with open(config_path, 'r', encoding='utf-8') as f:
-    config = json.load(f)
-
-PROJECTS_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..', config['project_base_path']))
-
-if not os.path.exists(PROJECTS_ROOT):
-    os.makedirs(PROJECTS_ROOT)
-
-FIXED_PROJECTS_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..', config['new_project_base_path']))
+PROJECTS_ROOT = get_project_base_path()
+FIXED_PROJECTS_ROOT = get_fixed_project_base_path()
 
 project = None
 

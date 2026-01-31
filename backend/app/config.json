@@ -3,6 +3,6 @@
   "env_base_path": "./data/venv",
   "fix_config_base_path": "../pcart/Configure",
   "project_base_path": "./data/projects",
-  "new_project_base_path":"./data/new_projects",
+  "fixed_project_base_path":"./data/fixed_projects",
   "fix_work_dir": "../pcart"
 }

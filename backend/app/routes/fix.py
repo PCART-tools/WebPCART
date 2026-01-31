@@ -2,29 +2,20 @@ from flask import Blueprint, jsonify, request, Response
 import os
 import json
 import subprocess
-import logging
 import shutil
 import time
+from .common import get_logger, get_config_base_path, get_env_base_path, get_project_base_path, get_fixed_project_base_path, get_work_dir
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
+logger = get_logger('fix')
 fix_bp = Blueprint('fix', __name__)
 
 # 读取配置文件
-config_path = os.path.join(os.path.dirname(__file__), '..', 'config.json')
-with open(config_path, 'r', encoding='utf-8') as f:
-    config = json.load(f)
+CONFIG_BASE_PATH = get_config_base_path()
+ENV_BASE_PATH = get_env_base_path()
+PROJECT_BASE_PATH = get_project_base_path()
+WORK_DIR = get_work_dir()
+FIXED_PROJECT_BASE_PATH = get_fixed_project_base_path() 
 
-CONFIG_BASE_PATH = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..', config['fix_config_base_path']))
-ENV_BASE_PATH = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..', config['env_base_path']))
-PROJECT_BASE_PATH = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..', config['project_base_path']))
-WORK_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..', config['fix_work_dir']))
-
-NEW_PROJECT_BASE_PATH = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..', config.get('new_project_base_path', './data/projects')))
-
-if not os.path.exists(NEW_PROJECT_BASE_PATH):
-    os.makedirs(NEW_PROJECT_BASE_PATH)
 # 生成配置文件
 def generate_fix_config(projectName, selectedLibrary, fix_command, run_file_path, final_project_path):
     current_env = os.path.join(ENV_BASE_PATH, 'current')
@@ -67,7 +58,7 @@ def run_fix():
             yield f"data: {json.dumps({'status': 'progress', 'step': 'Building the configuration file', 'progress': 10})}\n\n"
 
             original_project_path = os.path.join(PROJECT_BASE_PATH, project_name)
-            final_project_path = os.path.join(NEW_PROJECT_BASE_PATH, project_name)
+            final_project_path = os.path.join(FIXED_PROJECT_BASE_PATH, project_name)
 
             config_file_path = generate_fix_config(project_name, selected_library, run_command, run_file_path, final_project_path)
 

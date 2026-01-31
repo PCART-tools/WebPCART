@@ -8,23 +8,15 @@ import sys
 import logging
 import re
 import time
+from .common import get_logger, get_env_base_path, get_conda_path
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger('venv')
 
 venv_bp = Blueprint('venv', __name__)
 
 # 读取配置文件
-config_path = os.path.join(os.path.dirname(__file__), '..', 'config.json')
-with open(config_path, 'r', encoding='utf-8') as f:
-    config = json.load(f)
-
-ENV_BASE_PATH = os.path.join(os.path.dirname(__file__), '..', '..', config['env_base_path'])
-
-if not os.path.exists(ENV_BASE_PATH):
-    os.makedirs(ENV_BASE_PATH)
-
-CONDA_PATH = config['conda_path']
+ENV_BASE_PATH = get_env_base_path()
+CONDA_PATH = get_conda_path()
 
 # 获取已安装的依赖列表
 def get_packages(env_path):
