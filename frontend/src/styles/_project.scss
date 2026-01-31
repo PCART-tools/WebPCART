@@ -102,6 +102,12 @@
     border-radius: 5px;
 }
 
+.project-path{
+    white-space: nowrap;
+    overflow: hidden;
+    max-width: 100%;
+}
+
 .downloadProject{
     margin-left: auto;
     background: none;
@@ -177,4 +183,11 @@
 .download-button:hover{
     background-color: #e0e0e0;
     border-radius: 3px;
+}
+
+.divider-line {
+    height: 1px;
+    background-color: #ccc;
+    margin-top: 20px;
+    position: relative;
 }

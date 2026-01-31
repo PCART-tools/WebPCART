@@ -317,80 +317,82 @@ const additionalArgs = ref('')
 
 // 提取 Python 文件的函数
 const extractPythonFiles = (treeNode, currentPath = '') => {
-  let files = []
+    let files = []
   
-  if (treeNode.type === 'file' && treeNode.name.endsWith('.py')) {
-    files.push(currentPath ? `${currentPath}/${treeNode.name}` : treeNode.name)
-  } else if (treeNode.children) {
-    for (const child of treeNode.children) {
-      const childPath = currentPath ? `${currentPath}/${treeNode.name}` : treeNode.name
-      files = files.concat(extractPythonFiles(child, childPath))
+    if (treeNode.type === 'file' && treeNode.name.endsWith('.py')) {
+        files.push(currentPath ? `${currentPath}/${treeNode.name}` : treeNode.name)
+    } else if (treeNode.children) {
+        const sortedChildren = [...treeNode.children].sort((a, b) => a.name.localeCompare(b.name));
+
+        for (const child of sortedChildren) {
+            const childPath = currentPath ? `${currentPath}/${treeNode.name}` : treeNode.name
+            files = files.concat(extractPythonFiles(child, childPath))
+        }
     }
-  }
   
-  return files
+    return files
 }
 
 // 更新项目时提取 Python 文件
 const updatePythonFiles = (fileTree) => {
-  if (fileTree) {
-    pythonFiles.value = extractPythonFiles(fileTree, '')
-  } else {
-    pythonFiles.value = []
-  }
+    if (fileTree) {
+        pythonFiles.value = extractPythonFiles(fileTree, '')
+    } else {
+        pythonFiles.value = []
+    }
 }
 
 // 打开命令导入窗口
 const openCommandModal = (fileTree) => {
-  if (fileTree) {
-    updatePythonFiles(fileTree)
-    showCommandModal.value = true
-  }
+    if (fileTree) {
+        updatePythonFiles(fileTree)
+        showCommandModal.value = true
+    }
 }
 
 // 关闭命令导入窗口
 const closeCommandModal = () => {
-  showCommandModal.value = false
+    showCommandModal.value = false
 }
 
 // 保存命令
 const saveCommand = (command, filePath) => {
-  runCommand.value = command;
-  runFilePath.value = filePath;
-  closeCommandModal();
+    runCommand.value = command;
+    runFilePath.value = filePath;
+    closeCommandModal();
 }
 
 // 导出相关状态
 export {
-  showImportModal,
-  currentEnv,
-  targetEnv,
-  selectedEnvType,
-  importEnvMethod,
-  pythonVersion,
-  requirementFile,
-  condapackFile,
-  isCreatingCurrentEnv,
-  currentCreatingEnvStep,
-  currentEnvCreationProgress,
-  currentEnvCreationError,
-  isCreatingTargetEnv,
-  targetCreatingEnvStep,
-  targetEnvCreationProgress,
-  targetEnvCreationError,
-  showEnvDetailsModal,
-  envDetails,
-  selectedEnvDetailsType,
-  upgradLibraries,
-  environmentsReady, 
-  runCommand,
-  runFilePath,
-  showCommandModal,
-  pythonFiles,
-  selectedPythonFile,
-  additionalArgs,
-  openCommandModal,
-  closeCommandModal,
-  saveCommand,
-  updatePythonFiles
+    showImportModal,
+    currentEnv,
+    targetEnv,
+    selectedEnvType,
+    importEnvMethod,
+    pythonVersion,
+    requirementFile,
+    condapackFile,
+    isCreatingCurrentEnv,
+    currentCreatingEnvStep,
+    currentEnvCreationProgress,
+    currentEnvCreationError,
+    isCreatingTargetEnv,
+    targetCreatingEnvStep,
+    targetEnvCreationProgress,
+    targetEnvCreationError,
+    showEnvDetailsModal,
+    envDetails,
+    selectedEnvDetailsType,
+    upgradLibraries,
+    environmentsReady, 
+    runCommand,
+    runFilePath,
+    showCommandModal,
+    pythonFiles,
+    selectedPythonFile,
+    additionalArgs,
+    openCommandModal,
+    closeCommandModal,
+    saveCommand,
+    updatePythonFiles
 }

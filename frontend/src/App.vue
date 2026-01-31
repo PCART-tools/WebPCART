@@ -61,6 +61,8 @@
                         </div> 
                     </div>  
 
+                    <div v-if="!isUploading && fixedProject" class="divider-line"></div>
+
                     <div v-if="!isUploading && fixedProject" class="project">
                         <div class="project-header">
                             <span class="project-path">{{project}} -fixed</span>
@@ -302,6 +304,7 @@ import {
     loadCurrentProject,
     downloadProject,
     setFixedProject,
+    currentProjectType
 } from './composables/projectManager'
 
 import { 
@@ -498,7 +501,7 @@ onMounted(() => {
         if(e.ctrlKey && e.key === 's'){
             e.preventDefault();
             if(currentFilePath.value && isContentModified.value){
-                saveFile();
+                saveFile(currentProjectType.value);
             }
         }
     }

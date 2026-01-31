@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { showNotification } from './utils'
+import { runCommand } from './configManager'
 
 // 项目管理相关状态
 const project = ref(null)
@@ -8,6 +9,7 @@ const fileTree = ref(null)
 const fixedProject = ref(null)
 const fixedFileTree = ref(null)
 
+const currentProjectType = ref('original')
 const uploadProgress = ref(0)
 const isUploading = ref(false)
 const totalBatches = ref(0)
@@ -38,6 +40,9 @@ export const selectFolder = async() => {
             // 获取文件夹名称
             const firstFile = files[0];
             let folderName = firstFile.webkitRelativePath.split('/')[0];
+            
+            runCommand.value = null;
+            clearFixedProject();
             await setProject(folderName);
             await uploadFiles(folderName, files);
         };
@@ -221,7 +226,7 @@ export const downloadProject = async(projectType = 'original') => {
         if(isContentModified.value && currentFilePath.value){
             const save = confirm('There are unsaved changes. Do you want to save them before downloading?');
             if(save){
-                await saveFile();
+                await saveFile(projectType);
             }
         }
 
@@ -288,5 +293,6 @@ export {
     currentBatch,
     currentFilePath,
     originalContent,
-    isContentModified
+    isContentModified,
+    currentProjectType
 }

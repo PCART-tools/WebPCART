@@ -30,15 +30,12 @@
     </li>
 </template>
 
-//TODO 修改后项目的代码修改保存，添加新项目后清空修复后项目文件，两个项目之间的隔离样式
+//TODO 两个项目之间的隔离样式
 
 <script setup>
 import { ref } from 'vue'
 import { showNotification } from '../composables/utils'
-import { saveFile } from '../composables/projectManager'
-
-// 从projectManager导入状态
-import { currentFilePath, isContentModified } from '../composables/projectManager'
+import { saveFile, currentFilePath, isContentModified, currentProjectType } from '../composables/projectManager'
 
 const props = defineProps(['node', 'projectName', 'basePath', 'projectType'])
 
@@ -66,10 +63,11 @@ const handleNodeClick = () => {  // 处理文件点击
         if(isContentModified.value){
             const saveChanges = confirm('The current file has unsaved changes. Do you want to save them?');
             if(saveChanges){
-                saveFile();
+                saveFile(props.projectType);
             }
         }
 
+        currentProjectType.value = props.projectType;
         loadFileContent();
     }else if(props.node.type === 'directory'){
         toggleDirectory();

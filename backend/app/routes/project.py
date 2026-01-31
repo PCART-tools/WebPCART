@@ -3,6 +3,10 @@ import os
 import json
 import zipfile
 from io import BytesIO
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 project_bp = Blueprint('project', __name__)
 
@@ -145,7 +149,7 @@ def get_project_tree():
             children = []
 
             try:
-                for item in os.listdir(path):
+                for item in sorted(os.listdir(path)):
                     item_path = os.path.join(path, item)
                     child = build_tree(item_path)
                     if child:
