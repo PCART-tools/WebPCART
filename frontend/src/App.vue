@@ -61,7 +61,7 @@
                         </div> 
                     </div>  
 
-                    <div v-if="!isUploading && fixedProject" class="divider-line"></div>
+                    <!-- <div v-if="!isUploading && fixedProject" class="divider-line"></div>
 
                     <div v-if="!isUploading && fixedProject" class="project">
                         <div class="project-header">
@@ -73,7 +73,7 @@
                         <div v-if="fixedFileTree" class="file-tree">
                             <tree-view :tree-data="fixedFileTree" :project-name="fixedProject" project-type="fixed"/>
                         </div> 
-                    </div> 
+                    </div>  -->
                 </div>
 
                 <div v-show="projectView === 'detail'" class="detail-content">
@@ -304,7 +304,8 @@ import {
     loadCurrentProject,
     downloadProject,
     setFixedProject,
-    currentProjectType
+    currentProjectType,
+    loadProjectTree
 } from './composables/projectManager'
 
 import { 
@@ -448,7 +449,7 @@ const runFixCommand = async() => {
                             fixProgress.value = 100;
                             fixProgressStep.value = data.message;
 
-                            await setFixedProject(project.value)
+                            await loadProjectTree(project.value)
 
                             setTimeout(() => {
                                 showNotification('Fix completed successfully', 'success');
@@ -507,8 +508,6 @@ onMounted(() => {
     }
 
     document.addEventListener('keydown', handleKeyDown);
-
-    loadCurrentProject();
 })
 
 onUnmounted(() => {

@@ -305,5 +305,5 @@ export {
     currentFilePath,
     originalContent,
     isContentModified,
-    currentProjectType
+    currentProjectType,
 }

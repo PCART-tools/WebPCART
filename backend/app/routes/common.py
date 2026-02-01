@@ -45,7 +45,6 @@ def get_conda_path():
 
 required_dirs = [
     get_project_base_path(),
-    get_fixed_project_base_path(),
     get_config_base_path(),
     get_env_base_path(), 
 ]

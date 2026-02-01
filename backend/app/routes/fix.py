@@ -14,15 +14,15 @@ CONFIG_BASE_PATH = get_config_base_path()
 ENV_BASE_PATH = get_env_base_path()
 PROJECT_BASE_PATH = get_project_base_path()
 WORK_DIR = get_work_dir()
-FIXED_PROJECT_BASE_PATH = get_fixed_project_base_path() 
+# FIXED_PROJECT_BASE_PATH = get_fixed_project_base_path() 
 
 # 生成配置文件
-def generate_fix_config(projectName, selectedLibrary, fix_command, run_file_path, final_project_path):
+def generate_fix_config(projectName, selectedLibrary, fix_command, run_file_path, project_path):
     current_env = os.path.join(ENV_BASE_PATH, 'current')
     target_env = os.path.join(ENV_BASE_PATH, 'target')
     
     config_content = {
-        'projPath': final_project_path,
+        'projPath': project_path,
         'runCommand': fix_command,
         'runFilePath': run_file_path,
         'libName': selectedLibrary['name'],
@@ -57,38 +57,38 @@ def run_fix():
             # 构建配置文件
             yield f"data: {json.dumps({'status': 'progress', 'step': 'Building the configuration file', 'progress': 10})}\n\n"
 
-            original_project_path = os.path.join(PROJECT_BASE_PATH, project_name)
-            final_project_path = os.path.join(FIXED_PROJECT_BASE_PATH, project_name)
+            project_path = os.path.join(PROJECT_BASE_PATH, project_name)
+            #final_project_path = os.path.join(FIXED_PROJECT_BASE_PATH, project_name)
 
-            config_file_path = generate_fix_config(project_name, selected_library, run_command, run_file_path, final_project_path)
+            config_file_path = generate_fix_config(project_name, selected_library, run_command, run_file_path, project_path)
 
-            # 预处理最终目录
-            yield f"data: {json.dumps({'status': 'progress', 'step': 'Preparing project directory', 'progress': 20})}\n\n"
+            # # 预处理最终目录
+            # yield f"data: {json.dumps({'status': 'progress', 'step': 'Preparing project directory', 'progress': 20})}\n\n"
             
-            if os.path.exists(final_project_path):
-                shutil.rmtree(final_project_path)
-                logger.info(f"已清空最终项目路径: {final_project_path}")
-            os.makedirs(final_project_path, exist_ok=True)
+            # if os.path.exists(final_project_path):
+            #     shutil.rmtree(final_project_path)
+            #     logger.info(f"已清空最终项目路径: {final_project_path}")
+            # os.makedirs(final_project_path, exist_ok=True)
             
-            # 复制原始项目到最终项目目录
-            yield f"data: {json.dumps({'status': 'progress', 'step': 'Copying project files', 'progress': 30})}\n\n"
-            for item in os.listdir(original_project_path):
-                src_path = os.path.join(original_project_path, item)
-                dst_path = os.path.join(final_project_path, item)
-                if os.path.isdir(src_path):
-                    shutil.copytree(src_path, dst_path)
-                else:
-                    shutil.copy2(src_path, dst_path)
+            # # 复制原始项目到最终项目目录
+            # yield f"data: {json.dumps({'status': 'progress', 'step': 'Copying project files', 'progress': 30})}\n\n"
+            # for item in os.listdir(original_project_path):
+            #     src_path = os.path.join(original_project_path, item)
+            #     dst_path = os.path.join(final_project_path, item)
+            #     if os.path.isdir(src_path):
+            #         shutil.copytree(src_path, dst_path)
+            #     else:
+            #         shutil.copy2(src_path, dst_path)
             
-            logger.info(f"已将项目从 {original_project_path} 复制到 {final_project_path}")
+            # logger.info(f"已将项目从 {original_project_path} 复制到 {final_project_path}")
             
-            original_files = set()
-            for root, dirs, files in os.walk(final_project_path):
-                for file in files:
-                    rel_path = os.path.relpath(os.path.join(root, file), final_project_path)
-                    original_files.add(rel_path)
+            # original_files = set()
+            # for root, dirs, files in os.walk(final_project_path):
+            #     for file in files:
+            #         rel_path = os.path.relpath(os.path.join(root, file), final_project_path)
+            #         original_files.add(rel_path)
             
-            yield f"data: {json.dumps({'status': 'progress', 'step': 'Running the repair program', 'progress': 45})}\n\n"
+            # yield f"data: {json.dumps({'status': 'progress', 'step': 'Running the repair program', 'progress': 45})}\n\n"
             
             # 构建修复命令
             pcart_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'pcart', 'main.py')
@@ -130,19 +130,19 @@ def run_fix():
                 
                 yield f"data: {json.dumps({'status': 'progress', 'step': 'Post-processing results', 'progress': 80})}\n\n"
                 
-                # 删除原始文件（只删除发生了修复的文件)
-                for original_file in original_files:
-                    # 检查是否存在对应的新文件
-                    dir_path, file_name = os.path.split(original_file)
-                    new_file_name = f"new_{file_name}"
+                # # 删除原始文件（只删除发生了修复的文件)
+                # for original_file in original_files:
+                #     # 检查是否存在对应的新文件
+                #     dir_path, file_name = os.path.split(original_file)
+                #     new_file_name = f"new_{file_name}"
                     
-                    # 如果在同一目录下存在对应的新文件，则删除原始文件
-                    new_file_path = os.path.join(final_project_path, dir_path, new_file_name) if dir_path != '' else os.path.join(final_project_path, new_file_name)
+                #     # 如果在同一目录下存在对应的新文件，则删除原始文件
+                #     new_file_path = os.path.join(final_project_path, dir_path, new_file_name) if dir_path != '' else os.path.join(final_project_path, new_file_name)
                     
-                    if os.path.exists(new_file_path):
-                        file_path = os.path.join(final_project_path, original_file)
-                        if os.path.exists(file_path):
-                            os.remove(file_path)
+                #     if os.path.exists(new_file_path):
+                #         file_path = os.path.join(final_project_path, original_file)
+                #         if os.path.exists(file_path):
+                #             os.remove(file_path)
 
                 yield f"data: {json.dumps({'status': 'progress', 'step': 'Finalizing results', 'progress': 95})}\n\n"
                 time.sleep(0.5)
