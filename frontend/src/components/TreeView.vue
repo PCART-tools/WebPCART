@@ -12,6 +12,7 @@
 </template>
 
 <script setup>
+import { ref, provide } from 'vue';
 import TreeNode from './TreeNode.vue'
 
 defineProps(['treeData', 'projectName', 'projectType'])

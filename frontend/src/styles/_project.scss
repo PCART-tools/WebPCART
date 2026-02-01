@@ -155,6 +155,11 @@
     user-select: none;
 }
 
+.tree-node.selected {
+    background-color: #bde0ff;
+    font-weight: bold;
+}
+
 .tree-node:hover{
     background-color: #d2e0e7;
 }

@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, reactive } from 'vue'
 import { showNotification } from './utils'
 import { runCommand } from './configManager'
 
@@ -17,6 +17,17 @@ const currentBatch = ref(0)
 const currentFilePath = ref(null)
 const originalContent = ref('')
 const isContentModified = ref(false)
+
+// 选中文件状态
+export const selectedFile = reactive({
+    path: '',
+    projectType: ''
+})
+
+export function updateSelectedFile(path, projectType){
+    selectedFile.path = path;
+    selectedFile.projectType = projectType;
+}
 
 // 选择文件夹
 export const selectFolder = async() => {

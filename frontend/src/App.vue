@@ -28,9 +28,9 @@
                     >Project</button>
                     <button
                         class="nav-button"
-                        :class="{active: projectView === 'intermediate'}"
-                        @click="projectView = 'intermediate'"
-                    >Intermediate</button>
+                        :class="{active: projectView === 'detail'}"
+                        @click="projectView = 'detail'"
+                    >Details</button>
                 </div>
 
                 <div v-show="projectView === 'project'" class="project-content">
@@ -76,7 +76,7 @@
                     </div> 
                 </div>
 
-                <div v-show="projectView === 'intermediate'" class="intermediate-content">
+                <div v-show="projectView === 'detail'" class="detail-content">
                     <b>Run fix command to get results</b>
                 </div>               
             </div>

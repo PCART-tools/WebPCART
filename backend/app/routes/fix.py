@@ -130,11 +130,19 @@ def run_fix():
                 
                 yield f"data: {json.dumps({'status': 'progress', 'step': 'Post-processing results', 'progress': 80})}\n\n"
                 
-                # 删除原始文件
+                # 删除原始文件（只删除发生了修复的文件)
                 for original_file in original_files:
-                    file_path = os.path.join(final_project_path, original_file)
-                    if os.path.exists(file_path):
-                        os.remove(file_path)
+                    # 检查是否存在对应的新文件
+                    dir_path, file_name = os.path.split(original_file)
+                    new_file_name = f"new_{file_name}"
+                    
+                    # 如果在同一目录下存在对应的新文件，则删除原始文件
+                    new_file_path = os.path.join(final_project_path, dir_path, new_file_name) if dir_path != '' else os.path.join(final_project_path, new_file_name)
+                    
+                    if os.path.exists(new_file_path):
+                        file_path = os.path.join(final_project_path, original_file)
+                        if os.path.exists(file_path):
+                            os.remove(file_path)
 
                 yield f"data: {json.dumps({'status': 'progress', 'step': 'Finalizing results', 'progress': 95})}\n\n"
                 time.sleep(0.5)
