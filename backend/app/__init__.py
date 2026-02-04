@@ -9,9 +9,11 @@ def create_app():
     from .routes.project import project_bp
     from .routes.venv import venv_bp
     from .routes.fix import fix_bp
+    from .routes.report import report_bp
 
     app.register_blueprint(project_bp)
     app.register_blueprint(venv_bp)
     app.register_blueprint(fix_bp)
+    app.register_blueprint(report_bp)
 
     return app

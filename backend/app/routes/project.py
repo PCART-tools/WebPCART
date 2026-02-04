@@ -3,8 +3,7 @@ import os
 import json
 import zipfile
 from io import BytesIO
-import logging
-from .common import get_logger, get_project_base_path, get_fixed_project_base_path
+from ..common import get_logger, get_project_base_path, get_fixed_project_base_path
 
 logger = get_logger('project')
 project_bp = Blueprint('project', __name__)

@@ -8,7 +8,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # 加载配置文件
-config_path = os.path.join(os.path.dirname(__file__), '..', 'config.json')
+config_path = os.path.join(os.path.dirname(__file__), 'config.json')
 with open(config_path, 'r', encoding='utf-8') as f:
     config = json.load(f)
 
@@ -21,9 +21,9 @@ def get_project_base_path():
     )
 
 def get_fixed_project_base_path():
-    return os.path.normpath(
-        os.path.join(os.path.dirname(__file__), '..', '..', config['fixed_project_base_path'])
-    )
+     return os.path.normpath(
+         os.path.join(os.path.dirname(__file__), '..', '..', config['fixed_project_base_path'])
+     )
 
 def get_config_base_path():
     return os.path.normpath(

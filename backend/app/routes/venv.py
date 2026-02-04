@@ -8,7 +8,7 @@ import sys
 import logging
 import re
 import time
-from .common import get_logger, get_env_base_path, get_conda_path
+from ..common import get_logger, get_env_base_path, get_conda_path
 
 logger = get_logger('venv')
 

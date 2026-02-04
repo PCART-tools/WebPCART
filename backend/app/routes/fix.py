@@ -4,7 +4,7 @@ import json
 import subprocess
 import shutil
 import time
-from .common import get_logger, get_config_base_path, get_env_base_path, get_project_base_path, get_fixed_project_base_path, get_work_dir
+from ..common import get_logger, get_config_base_path, get_env_base_path, get_project_base_path, get_fixed_project_base_path, get_work_dir
 
 logger = get_logger('fix')
 fix_bp = Blueprint('fix', __name__)
