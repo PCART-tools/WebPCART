@@ -77,15 +77,116 @@
                 </div>
 
                 <div v-show="projectView === 'detail'" class="detail-content">
-                    <b>Run fix command to get results</b>
+                    <div v-if="fixCompleted" class="detail-buttons">
+                        <button @click="getReport" class="detail-button">Report</button>
+                    </div>
+                    
+                    <div v-else>
+                        <b>Run fix command to get results</b>
+                    </div>       
                 </div>               
             </div>
 
             <div class="app-code">
                 <!-- 代码编辑栏 -->
-                <div class="editor-container" ref="editorRef" :class="{disabled: !currentFilePath}" v-show="currentFilePath"></div>
-                <div v-if="!currentFilePath" class="editor-placeholder">
+                <div v-if="projectView === 'project'" class="editor-container" ref="editorRef" :class="{disabled: !currentFilePath}" v-show="currentFilePath"></div>
+                <div v-if="projectView === 'project' && !currentFilePath" class="editor-placeholder">
                     <b>choose a file(.py / .txt) to edit</b>
+                </div>
+
+                <!-- 结果展示栏 -->
+                <div v-if="projectView === 'detail'" class="detail-view-container">
+                    <div v-if="reportData" class="report-content">
+                        <div class="report-header">
+                            <h3>Compatibility Report</h3>
+                        </div>
+                        
+                        <!-- 统计信息卡片 -->
+                        <div class="report-stats" v-if="reportData.stat_info">
+                            <div class="stats-grid first-row">
+                                <div class="stat-card">
+                                    <h4>Total Files</h4>
+                                    <p class="stat-number">{{ reportData.stat_info.total_file_number || 0 }}</p>
+                                </div>
+                                <div class="stat-card">
+                                    <h4>Total APIs</h4>
+                                    <p class="stat-number">{{ reportData.stat_info.total_api_number || 0 }}</p>
+                                </div>
+                            </div>
+                            
+                            <div class="stats-grid second-row">
+                                <div class="stat-card">
+                                    <h4>Covered APIs</h4>
+                                    <p class="stat-number">{{ reportData.stat_info.covered_number || 0 }}</p>
+                                </div>
+                                <div class="stat-card">
+                                    <h4>Uncovered APIs</h4>
+                                    <p class="stat-number">{{ (reportData.stat_info.total_api_number - reportData.stat_info.covered_number) || 0 }}</p>
+                                </div>
+                                <div class="stat-card">
+                                    <h4>Compatible APIs</h4>
+                                    <p class="stat-number">{{ reportData.stat_info.compatible_number || 0 }}</p>
+                                </div>
+                                <div class="stat-card">
+                                    <h4>Unknown Compatible APIs</h4>
+                                    <p class="stat-number">{{ reportData.stat_info.unknown_compatible_number || 0 }}</p>
+                                </div>
+                                <div class="stat-card">
+                                    <h4>Incompatible APIs</h4>
+                                    <p class="stat-number">{{ reportData.stat_info.incompatible_number || 0 }}</p>
+                                </div>
+                            </div>
+                            
+                            <div class="stats-grid third-row">
+                                <div class="stat-card">
+                                    <h4>Successfully Repaired</h4>
+                                    <p class="stat-number">{{ reportData.stat_info.successfully_repaired_number || 0 }}</p>
+                                </div>
+                                <div class="stat-card">
+                                    <h4>Failed to Repair</h4>
+                                    <p class="stat-number">{{ reportData.stat_info.failed_repair_number || 0 }}</p>
+                                </div>
+                                <div class="stat-card">
+                                    <h4>Unknown Repair Status</h4>
+                                    <p class="stat-number">{{ reportData.stat_info.unknown_repair_status_number || 0 }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- API详细信息 -->
+                        <div class="api-details" v-if="reportData.api_details && reportData.api_details.length > 0">
+                            <h4>Detailed API Analysis</h4>
+                            <div class="api-table-container">
+                                <table class="api-table">
+                                    <thead>
+                                        <tr>
+                                            <th>API Call</th>
+                                            <th>Location</th>
+                                            <th>Coverage</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="(api, index) in reportData.api_details" :key="index" :class="getRowClass(api)" @click="showAPIDetail(api)">
+                                            <td><code>{{ api.invoked_api }}</code></td>
+                                            <td>{{ api.location }}</td>
+                                            <td>
+                                                <span :class="api.coverage === 'Yes' ? 'coverage-covered' : 'coverage-not-covered'">
+                                                    {{ api.coverage }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <div v-else-if="reportData">
+                            <p>No API details available in the reportData.</p>
+                        </div>
+                    </div>
+                    <div v-else class="detail-placeholder">
+                        <b>Select a command to view details</b>
+                    </div>
                 </div>
             </div>
 
@@ -281,6 +382,12 @@
         @closeCommandModal="closeCommandModal"
         @saveCommand="saveCommand"
     />
+
+    <APIDetailModal 
+    :show="showAPIDetailModal" 
+    :api-detail="selectedAPIDetail" 
+    @close="closeAPIDetailModal"
+    />
 </template>
 
 <script setup>
@@ -292,8 +399,6 @@ import TreeView from './components/TreeView.vue'
 import { 
     project, 
     fileTree, 
-    fixedProject,
-    fixedFileTree,
     uploadProgress, 
     isUploading, 
     currentFilePath, 
@@ -301,11 +406,10 @@ import {
     isContentModified,
     selectFolder,
     saveFile,
-    loadCurrentProject,
     downloadProject,
-    setFixedProject,
     currentProjectType,
-    loadProjectTree
+    loadProjectTree,
+    fixCompleted
 } from './composables/projectManager'
 
 import { 
@@ -348,7 +452,17 @@ import {
     saveCommand,
 } from './composables/configManager'
 
+import { 
+    reportData,
+    getReport,
+    showAPIDetailModal,
+    closeAPIDetailModal,
+    showAPIDetail,
+    selectedAPIDetail
+} from './composables/detailManager'
+
 import CommandSelectionModal from './components/RunCommandModal.vue';
+import APIDetailModal from './components/APIDetailModal.vue'
 
 import { showNotification } from './composables/utils'
 
@@ -368,7 +482,6 @@ const isRunningFix = ref(false)
 const fixProgressStep = ref('Initializing')
 const fixProgress = ref(0)
 const fixError = ref('')
-
 
 const handleSelectedLibrary = computed({
     get(){
@@ -455,6 +568,7 @@ const runFixCommand = async() => {
                                 showNotification('Fix completed successfully', 'success');
                             }, 1000);
 
+                            fixCompleted.value = true;
                             isRunningFix.value = false;
                             return;
                         }
@@ -470,6 +584,16 @@ const runFixCommand = async() => {
         console.error('Failed to run fix with progress', error);
         showNotification('Failed to run fix:' + error.message, 'error');
     }
+}
+
+const getRowClass = (api) => {
+  if (api.coverage === 'No' || api.coverage === 'no' || api.coverage === false) {
+    return 'uncovered-row';
+  } else if (api.compatible) {
+    return 'covered-compatible-row';
+  } else {
+    return 'covered-incompatible-row';
+  }
 }
 
 onMounted(() => { 
@@ -527,4 +651,5 @@ onUnmounted(() => {
 @use "./styles/_config.scss";
 @use "./styles/_editor.scss";
 @use "./styles/_modal.scss";
+@use "./styles/_detail.scss";
 </style>

@@ -3,7 +3,7 @@ import os
 import re
 from typing import Dict, List, Any
 
-from ..common import get_logger
+from ..common import get_logger, get_work_dir
 
 logger = get_logger('report')
 report_bp = Blueprint('report', __name__)
@@ -24,7 +24,7 @@ class ReportParser:
         stat_info = self._parse_stat_info(content)
 
         # 解析具体API调用信息
-        api_details = self._parse_api_details(content)
+        api_details = self._parse_api_calls(content)
 
         return{
             "stat_info": stat_info,
@@ -34,113 +34,119 @@ class ReportParser:
     # 解析总体统计信息
     def _parse_stat_info(self, content: str) -> Dict[str, Any]:
         stats = {}
+        
+        try:
+            if not content:
+                return stats
+            
+            logger.info("start parse_stat_info")
+                
+            # 逐个测试每个正则表达式
+            patterns = {
+                'total_file_number': r'Total File Number: (\d+)',
+                'total_api_number': r'Total [^:]+ Invoked API Number: (\d+)',
+                'not_covered_number': r'Not Covered [^:]+ Invoked API Number: (\d+)/(\d+)',
+                'covered_number': r'Covered [^:]+ Invoked API Number: (\d+)/(\d+)',
+                'compatible_number': r'Compatible [^:]+ Invoked API Number: (\d+)/(\d+)',
+                'unknown_compatible_number': r'Unknown Compatible [^:]+ Invoked API Number: (\d+)/(\d+)',
+                'incompatible_number': r'Incompatible [^:]+ Invoked API Number: (\d+)/(\d+)',
+                'successfully_repaired_number': r'-> Successfully Repaired [^:]+ Invoked API number: (\d+)/(\d+)',
+                'failed_repair_number': r'-> Failed to Repair [^:]+ Invoked API Number: (\d+)/(\d+)',
+                'unknown_repair_status_number': r'-> Unknown Repair Status [^:]+ Invoked API Number: (\d+)/(\d+)'
+            }
+            
+            for key, pattern in patterns.items():
+                try:
+                    match = re.search(pattern, content)
+                    if match:
+                        stats[key] = int(match.group(1))
+                        logger.debug(f"Matched {key}: {match.group(1)}")
+                except Exception as e:
+                    logger.error(f"Error parsing {key} with pattern {pattern}: {e}")
 
-        # 正则匹配获取数据
-        total_files_match = re.search(r'Total File Number: (\d+)', content)
-        if total_files_match:
-            stats['total_file_number'] = int(total_files_match.group(1))
-        
-        total_api_match = re.search(r'Total \w+ Invoked API Number: (\d+)', content)
-        if total_api_match:
-            stats['total_api_number'] = int(total_api_match.group(1))
-        
-        not_covered_match = re.search(r'Not Covered \w+ Invoked API Number: (\d+)/(\d+)', content)
-        if not_covered_match:
-            stats['not_covered_number'] = int(not_covered_match.group(1))
-        
-        covered_match = re.search(r'Covered \w+ Invoked API Number: (\d+)/(\d+)', content)
-        if covered_match:
-            stats['covered_number'] = int(covered_match.group(1))
-        
-        compatible_match = re.search(r'Compatible \w+ Invoked API Number: (\d+)/(\d+)', content)
-        if compatible_match:
-            stats['compatible_number'] = int(compatible_match.group(1))
-        
-        unknown_compatible_match = re.search(r'Unknown Compatible \w+ Invoked API Number: (\d+)/(\d+)')
-        if unknown_compatible_match:
-            stats['unknown_compatible_number'] = int(unknown_compatible_match.group(1))
-
-        incompatible_match = re.search(r'Incompatible \w+ Invoked API Number: (\d+)/(\d+)', content)
-        if incompatible_match:
-            stats['incompatible_number'] = int(incompatible_match.group(1))
-
-        successfully_repaired_match = re.search(r'-> Successfully Repaired \w+ Invoked API number: (\d+)/(\d+)', content)
-        if successfully_repaired_match:
-            stats['successfully_repaired_number'] = int(successfully_repaired_match.group(1))
-        
-        failed_repair_match = re.search(r'-> Failed to Repair \w+ Invoked API Number: (\d+)/(\d+)', content)
-        if failed_repair_match:
-            stats['failed_repair_number'] = int(failed_repair_match.group(1))
-        
-        unknown_repair_match = re.search(r'-> Unknown Repair Status \w+ Invoked API Number: (\d+)/(\d+)', content)
-        if unknown_repair_match:
-            stats['unknown_repair_status_number'] = int(unknown_repair_match.group(1))
-        
+            logger.info("end parse_stat_info")     
+        except Exception as e:
+            logger.error(f"Error in _parse_stat_info: {e}")
+            raise
+            
         return stats       
     
     # 解析API详细信息
-    def _parse_api_details(self, content:str) -> List[Dict[str, Any]]:
-        api_details = []
-
-        # 提取库名
-        lib_name = "library"  
-        
-        total_api_match = re.search(r'Total (\w+) Invoked API Number:', content)
-        if total_api_match:
-            lib_name = total_api_match.group(1)
-
-        file_pattern = r'=+\n\|.*?File #(\d+): (.*?) has (\d+) \w+ Invoked API\(s\)\s*\|\n=+((?:.|\n)*?)\n(?======================================================|=+\n|$)'
-        file_matches = re.findall(file_pattern, content, re.MULTILINE)
-
-        for file_num, file_path, api_count_str, file_content in file_matches:
-            # 获取api调用信息
-            api_calls = self._extract_api_calls(file_content, lib_name) 
-
-            for j, api_call in enumerate(api_calls):
-                api_details.append({
-                    'file_id': f"{file_num}-{j+1}",
-                    'file_path': file_path.strip(),
-                    'api_index': j+1,
-                    'invoked_api': api_call.get('invoked_api'),
-                    'location': api_call.get('location'),
-                    'coverage': api_call.get('coverage'),
-                    'definition_v1': api_call.get('definition_v1'),
-                    'definition_v2': api_call.get('definition_v2'),
-                    'compatible': api_call.get('compatible'),
-                    'compatibility_status': api_call.get('compatibility_status')
-                }) 
-
-        return api_details
-    
-    # 提取一个文件中的调用信息
-    def _extract_api_calls(self, content: str, lib_name: str) -> List[Dict[str, Any]]:
+    def _parse_api_calls(self, content: str) -> List[Dict[str, Any]]:
         api_calls = []
 
-        api_pattern = r'\| Invoked API #\d+: ([^\n\r]+?)\s*\|\s*\|\s*Location: (.*?)\s*\|\s*\|\s*Coverage: (.*?)\s*\|\s*\|\s*Definition @(.*?) <static>: {(.*?)}\s*\|\s*\|\s*Definition @(.*?) <static>: {(.*?)}\s*\|\s*\|\s*Compatible: (.*?)\s*\|'
-        matches = re.findall(api_pattern, content, re.DOTALL)
+        # 分割每个API调用块
+        api_blocks = re.split(r'\n(?=\| Invoked API #)', content)
+
+        logger.info(f"api_blocks size: {len(api_blocks)}")
         
-        for match in matches:
-            invoked_api, location, coverage, ver1, def1, ver2, def2, compatible_str = match
+        for block in api_blocks[1:]:
+            # 查找API调用行
+            invoked_api_match = re.search(r'\| Invoked API #\d+: ([^\n\r]+)', block)
+            if not invoked_api_match:
+                continue
+                
+            invoked_api = invoked_api_match.group(1).strip().replace('|', '').strip()
             
-            # 清理数据
-            invoked_api = invoked_api.strip().replace('\n', '').replace('|', '').strip()
-            location = location.replace('At Line', '').replace('in', '').strip()
-            coverage = coverage.strip()
-            compatible = compatible_str.strip().lower() == 'yes'
-            compatibility_status = "compatible" if compatible else "incompatible"
-            definition_v1 = def1.strip().replace("'", "").replace('"', '')
-            definition_v2 = def2.strip().replace("'", "").replace('"', '')
+            # 查找位置信息
+            location_match = re.search(r'Location: At Line (.+?) in (.+)', block)
+            location = ""
+            if location_match:
+                line_num = location_match.group(1).strip()
+                file_path = location_match.group(2).strip()
+                file_path = file_path.rstrip('|').strip()
+                location = f"{line_num} in {file_path}"
             
-            api_calls.append({
+            # 查找覆盖
+            coverage_match = re.search(r'Coverage: (.+)', block)
+            coverage = coverage_match.group(1).strip()
+            coverage = coverage.rstrip('|').strip()
+
+            api_call_dict = {
                 'invoked_api': invoked_api,
                 'location': location,
                 'coverage': coverage,
-                'definition_v1': definition_v1,
-                'definition_v2': definition_v2,
-                'compatible': compatible,
-                'compatibility_status': compatibility_status
-            })
+            }
 
+            if coverage == 'Yes':  
+                # 查找版本定义
+                def_matches = re.findall(r'Definition @[^<]+ <\w+>: (\{.*?\}|\(.*?\))', block, re.DOTALL)
+                def1 = def_matches[0].strip()
+                def1 = re.sub(r'\s*\|\s*\n\s*\|\s*', '', def1).rstrip('|').strip()
+                def2 = def_matches[1].strip()
+                def2 = re.sub(r'\s*\|\s*\n\s*\|\s*', '', def2).rstrip('|').strip()
+                
+                # 查找兼容性状态
+                compatible_match = re.search(r'Compatible: (.+)', block)
+                compatible_str = compatible_match.group(1).strip()
+                compatible_str = compatible_str.rstrip('|').strip()
+
+                logger.info(compatible_str)
+
+                compatible = compatible_str.lower() == 'yes'
+                
+                # 查找修复信息
+                if compatible == False:
+                    repair_match = re.search(r'Repair <(Successful|Failed|Unknown)>: (.+)', block)
+                    repair_status = None
+                    repair_result = ""
+                    if repair_match:
+                        repair_status = repair_match.group(1).lower()
+                        repair_result = repair_match.group(2).strip()
+            
+            if coverage == 'Yes':
+                api_call_dict['definition_v1'] = def1
+                api_call_dict['definition_v2'] = def2
+                api_call_dict['compatible'] = compatible
+
+                if compatible == False and repair_status:
+                    api_call_dict['repair_status'] = repair_status
+                    api_call_dict['repair_result'] = repair_result
+            
+            api_calls.append(api_call_dict)
+
+        return api_calls
+    
     # 根据条件过滤数据
     def filter_data(self, filters: Dict[str, Any]) -> Dict[str, Any]:
         parsed_data = self.parse_report()
@@ -155,14 +161,6 @@ class ReportParser:
                     detail for detail in filtered_details
                     if detail['compatibility_status'] == status
                 ]
-        
-        # 按文件路径过滤
-        if 'file_path' in filters and filters['file_path']:
-            file_path = filters['file_path']
-            filtered_details = [
-                detail for detail in filtered_details
-                if file_path.lower() in detail['file_path'].lower()
-            ]
 
         return {
             "stat_info": parsed_data['stat_info'],
@@ -173,10 +171,13 @@ class ReportParser:
 @report_bp.route('/report/<project_name>', methods=['GET'])
 def get_project_report(project_name):
     try:
+        logger.info("projectName:" + project_name)
         # 构建报告路径
-        project_reports_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'pcart', 'Report')
+        project_reports_dir = os.path.join(get_work_dir(), 'Report')
         report_filename = f"{project_name}.txt"
         report_path = os.path.join(project_reports_dir, report_filename)
+
+        logger.info("reportPath:" + report_path)
         
         if not os.path.exists(report_path):
             return jsonify({
@@ -199,4 +200,35 @@ def get_project_report(project_name):
             "status": "error"
         }), 500
 
+# 按条件过滤报告
+@report_bp.route('/report/<project_name>/filtered', methods=['POST'])
+def get_filtered_report(project_name):
+    try:
+        filters = request.get_json()
+        
+        # 构建报告路径
+        project_reports_dir = os.path.join(get_work_dir(), 'Report')
+        report_filename = f"{project_name}.txt"
+        report_path = os.path.join(project_reports_dir, report_filename)
+        
+        if not os.path.exists(report_path):
+            return jsonify({
+                "message": f"Report {project_name}.txt does not exist",
+                "status": "error"
+            }), 404
+        
+        # 解析报告
+        parser = ReportParser(report_path)
+        data = parser.filter_data(filters)
+        
+        return jsonify({
+            "data": data,
+            "status": "success",
+            "report_name": report_filename
+        })
+    except Exception as e:
+        return jsonify({
+            "message": f"Failed to parse report: {str(e)}",
+            "status": "error"
+        }), 500
 

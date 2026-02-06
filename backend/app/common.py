@@ -17,27 +17,27 @@ def get_logger(name: str) -> logging.Logger:
 
 def get_project_base_path():
     return os.path.normpath(
-        os.path.join(os.path.dirname(__file__), '..', '..', config['project_base_path'])
+        os.path.join(os.path.dirname(__file__), '..', config['project_base_path'])
     )
 
 def get_fixed_project_base_path():
      return os.path.normpath(
-         os.path.join(os.path.dirname(__file__), '..', '..', config['fixed_project_base_path'])
+         os.path.join(os.path.dirname(__file__), '..', config['fixed_project_base_path'])
      )
 
 def get_config_base_path():
     return os.path.normpath(
-        os.path.join(os.path.dirname(__file__), '..', '..', config['fix_config_base_path'])
+        os.path.join(os.path.dirname(__file__), '..', config['fix_config_base_path'])
     )
 
 def get_env_base_path():
     return os.path.normpath(
-        os.path.join(os.path.dirname(__file__), '..', '..', config['env_base_path'])
+        os.path.join(os.path.dirname(__file__), '..', config['env_base_path'])
     )
 
 def get_work_dir():
     return os.path.normpath(
-        os.path.join(os.path.dirname(__file__), '..', '..', config['fix_work_dir'])
+        os.path.join(os.path.dirname(__file__), '..', config['fix_work_dir'])
     )
 
 def get_conda_path():

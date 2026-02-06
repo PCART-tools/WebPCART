@@ -6,6 +6,7 @@ import { runCommand } from './configManager'
 const project = ref(null)
 const fileTree = ref(null)
 
+const fixCompleted = ref(false)
 const fixedProject = ref(null)
 const fixedFileTree = ref(null)
 
@@ -53,6 +54,7 @@ export const selectFolder = async() => {
             let folderName = firstFile.webkitRelativePath.split('/')[0];
             
             runCommand.value = null;
+            fixCompleted.value = false;
             clearFixedProject();
             await setProject(folderName);
             await uploadFiles(folderName, files);
@@ -306,4 +308,5 @@ export {
     originalContent,
     isContentModified,
     currentProjectType,
+    fixCompleted
 }
