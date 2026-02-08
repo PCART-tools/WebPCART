@@ -76,10 +76,14 @@
 }
 
 .second-row {
-  grid-template-columns: repeat(5, 1fr); 
+  grid-template-columns: repeat(2, 1fr); 
 }
 
 .third-row {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.fourth-row {
   grid-template-columns: repeat(3, 1fr);
 }
 
@@ -101,6 +105,34 @@
     font-size: 1.2em;
     font-weight: bold;
     color: #007bff;
+  }
+
+  .wide{
+    grid-column: span 3;
+    min-width: 100%;
+  }
+}
+
+.run-command-section {
+  margin-bottom: 20px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  
+  h4 {
+    margin: 0;
+    font-size: 1em;
+    color: #333;
+  }
+  
+  .command-text {
+    font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
+    font-size: 0.95em;
+    font-weight: normal;
+    background-color: #e9ecef;
+    padding: 3px 6px;
+    border-radius: 4px;
+    margin-left: 5px;
   }
 }
 

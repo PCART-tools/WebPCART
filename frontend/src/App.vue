@@ -103,6 +103,10 @@
                         
                         <!-- 统计信息卡片 -->
                         <div class="report-stats" v-if="reportData.stat_info">
+                            <div class="run-command-section">
+                                <h4>Run Command: <span class="command-text">{{ reportData.stat_info.run_command }}</span></h4>
+                            </div>
+                            
                             <div class="stats-grid first-row">
                                 <div class="stat-card">
                                     <h4>Total Files</h4>
@@ -123,6 +127,9 @@
                                     <h4>Uncovered APIs</h4>
                                     <p class="stat-number">{{ (reportData.stat_info.total_api_number - reportData.stat_info.covered_number) || 0 }}</p>
                                 </div>
+                            </div>
+                            
+                            <div class="stats-grid third-row">
                                 <div class="stat-card">
                                     <h4>Compatible APIs</h4>
                                     <p class="stat-number">{{ reportData.stat_info.compatible_number || 0 }}</p>
@@ -137,7 +144,7 @@
                                 </div>
                             </div>
                             
-                            <div class="stats-grid third-row">
+                            <div class="stats-grid fourth-row">
                                 <div class="stat-card">
                                     <h4>Successfully Repaired</h4>
                                     <p class="stat-number">{{ reportData.stat_info.successfully_repaired_number || 0 }}</p>

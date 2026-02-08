@@ -40,6 +40,11 @@ class ReportParser:
                 return stats
             
             logger.info("start parse_stat_info")
+
+            run_command_match = re.search(r'Run Command: (.+)', content)
+            if run_command_match:
+                stats['run_command'] = run_command_match.group(1).strip()
+                logger.debug(f"Matched run_command: {run_command_match.group(1).strip()}")
                 
             # 逐个测试每个正则表达式
             patterns = {
@@ -93,14 +98,12 @@ class ReportParser:
             location = ""
             if location_match:
                 line_num = location_match.group(1).strip()
-                file_path = location_match.group(2).strip()
-                file_path = file_path.rstrip('|').strip()
+                file_path = location_match.group(2).strip().rstrip('|').strip()
                 location = f"{line_num} in {file_path}"
             
             # 查找覆盖
             coverage_match = re.search(r'Coverage: (.+)', block)
-            coverage = coverage_match.group(1).strip()
-            coverage = coverage.rstrip('|').strip()
+            coverage = coverage_match.group(1).strip().rstrip('|').strip()
 
             api_call_dict = {
                 'invoked_api': invoked_api,
@@ -118,8 +121,7 @@ class ReportParser:
                 
                 # 查找兼容性状态
                 compatible_match = re.search(r'Compatible: (.+)', block)
-                compatible_str = compatible_match.group(1).strip()
-                compatible_str = compatible_str.rstrip('|').strip()
+                compatible_str = compatible_match.group(1).strip().rstrip('|').strip()
 
                 logger.info(compatible_str)
 
@@ -132,7 +134,7 @@ class ReportParser:
                     repair_result = ""
                     if repair_match:
                         repair_status = repair_match.group(1).lower()
-                        repair_result = repair_match.group(2).strip()
+                        repair_result = repair_match.group(2).strip().rstrip('|').strip()
             
             if coverage == 'Yes':
                 api_call_dict['definition_v1'] = def1
