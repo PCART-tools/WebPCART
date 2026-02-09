@@ -89,13 +89,13 @@
 
             <div class="app-code">
                 <!-- 代码编辑栏 -->
-                <div v-if="projectView === 'project'" class="editor-container" ref="editorRef" :class="{disabled: !currentFilePath}" v-show="currentFilePath"></div>
-                <div v-if="projectView === 'project' && !currentFilePath" class="editor-placeholder">
+                <div v-show="projectView === 'project' && currentFilePath" class="editor-container" ref="editorRef" :class="{disabled: !currentFilePath}"></div>
+                <div v-show="projectView === 'project' && !currentFilePath" class="editor-placeholder">
                     <b>choose a file(.py / .txt) to edit</b>
                 </div>
 
                 <!-- 结果展示栏 -->
-                <div v-if="projectView === 'detail'" class="detail-view-container">
+                <div v-show="projectView === 'detail'" class="detail-view-container">
                     <div v-if="reportData" class="report-content">
                         <div class="report-header">
                             <h3>Compatibility Report</h3>
@@ -258,7 +258,7 @@
 
                 <button class="run-button" 
                         :disabled="!project || !selectedLibrary || !runCommand"
-                        @click="runFixCommand">
+                        @click="runFixCommand()">
                     {{ isRunningFix ? 'Running...' : 'Run' }}
                 </button>    
                 
@@ -281,104 +281,34 @@
     </div>
 
     <!-- 环境导入窗口 -->
-    <div v-if="showImportModal" class="modal-overlay" @click="closeImportEnvModal">
-        <div class="modal-container" @click.stop>
-            <div class="modal-header">
-                <h3>Import {{selectedEnvType}} Environment</h3>
-                <button class="modal-close" @click="closeImportEnvModal">&times;</button>
-            </div>
+    <EnvironmentImportModal
+        :show-import-modal="showImportModal"
+        :selected-env-type="selectedEnvType"
+        :import-env-method="importEnvMethod"
+        :python-version="pythonVersion"
+        :requirement-file="requirementFile"
+        :condapack-file="condapackFile"
+        :is-creating-current-env="isCreatingCurrentEnv"
+        :current-creating-env-step="currentCreatingEnvStep"
+        :current-env-creation-progress="currentEnvCreationProgress"
+        :current-env-creation-error="currentEnvCreationError"
+        :is-creating-target-env="isCreatingTargetEnv"
+        :target-creating-env-step="targetCreatingEnvStep"
+        :target-env-creation-progress="targetEnvCreationProgress"
+        :target-env-creation-error="targetEnvCreationError"
+        @close-import-env-modal="closeImportEnvModal"
+        @handle-requirement-select="handleRequirementSelect"
+        @handle-condapack-select="handleCondapackSelect"
+        @create-environment="createEnvironment"
+    />
 
-            <div class="modal-body"> 
-                <div class="form-group">
-                    <label>Import Method:</label>
-                    <select v-model="importEnvMethod" class="form-control">
-                        <option value="requirements">From requirements.txt</option>
-                        <option value="condapack">From condapack</option>
-                    </select>
-                </div>
-
-                <div v-if="importEnvMethod === 'requirements'" class="import-method-section">
-                    <div>
-                        <label>Python Version</label>
-                        <select v-model="pythonVersion" class="form-control">
-                            <option value="python3.8">Python 3.8</option>
-                            <option value="python3.9">Python 3.9</option>
-                            <option value="python3.10">Python 3.10</option>
-                            <option value="python3.11">Python 3.11</option>
-                            <option value="python3.12">Python 3.12</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Requirements File</label>
-                        <input type="file" accept=".txt" @change="handleRequirementSelect" class="file-input"/>
-                    </div>
-                </div>
-
-                <div v-else-if="importEnvMethod == 'condapack'" class="import-method-section">
-                    <div class="form-group">
-                        <label>Conda Pack File</label>
-                        <input type="file" accept=".tar,.tar.gz,.tgz" @change="handleCondapackSelect" class="file-input"/>
-                    </div>
-                </div>
-            </div>
-
-            <div v-if="selectedEnvType == 'current' ? isCreatingCurrentEnv : isCreatingTargetEnv" class="progress-section">
-                <div class="progress-label">
-                    {{selectedEnvType == 'current'? currentCreatingEnvStep : targetCreatingEnvStep}}
-                </div>
-                <div class="progress-bar-background">
-                    <div class="progress-bar-fill"
-                     :style="{width: (selectedEnvType == 'current' ? currentEnvCreationProgress : targetEnvCreationProgress) + '%'}"></div>
-                </div>
-            </div>
-
-            <div v-if="selectedEnvType == 'current' ? currentEnvCreationError : targetEnvCreationError" class="error-message">
-                {{selectedEnvType === 'current' ? currentEnvCreationError : targetEnvCreationError}}
-            </div>
-
-            <div class="modal-footer">
-                <button @click="closeImportEnvModal" class="cancel-button">Cancel</button>
-                <button
-                    @click="createEnvironment"
-                    class="confirm-button"
-                    :disabled="(importEnvMethod === 'requirements' && !requirementFile) ||
-                                (importEnvMethod === 'condapack' && !condapackFile) ||  
-                                (selectedEnvType === 'current' ? isCreatingCurrentEnv : isCreatingTargetEnv)">
-                    {{(selectedEnvType === 'current' ? isCreatingCurrentEnv : isCreatingTargetEnv) ? 'Creating...' : 'Confirm'}}
-                </button>
-            </div>
-        </div>
-    </div>
     <!-- 虚拟环境详情窗口 -->
-    <div v-if="showEnvDetailsModal" class="modal-overlay" @click="closeEnvDetailsModal">
-        <div class="modal-container" @click.stop>
-            <div class="modal-header">
-                <h3>{{selectedEnvDetailsType}} Environment Details</h3>
-                <button class="modal-close" @click="closeEnvDetailsModal">&times;</button>
-            </div>
-
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Python Version</label>
-                    <div class="env-detail-value">{{envDetails.pythonVersion}}</div>
-                </div>
-
-                <div class="form-group">
-                    <label>Dependencies:</label>
-                    <div v-if="envDetails.dependencies && envDetails.dependencies.length > 0" class="dependencies-list">
-                        <div v-for="(dep, index) in envDetails.dependencies" :key="index" class="dependency-item">
-                            {{dep}}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button @click="closeEnvDetailsModal" class="cancel-button">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    <EnvironmentDetailsModal
+        :show-env-details-modal="showEnvDetailsModal"
+        :env-details="envDetails"
+        :selected-env-details-type="selectedEnvDetailsType"
+        @close-env-details-modal="closeEnvDetailsModal"
+    />
 
     <CommandSelectionModal
         :show-command-modal="showCommandModal"
@@ -415,7 +345,6 @@ import {
     saveFile,
     downloadProject,
     currentProjectType,
-    loadProjectTree,
     fixCompleted
 } from './composables/projectManager'
 
@@ -449,7 +378,6 @@ import {
     upgradLibraries,
     environmentsReady,
     runCommand,
-    runFilePath,
     showCommandModal,
     pythonFiles,
     selectedPythonFile,
@@ -468,10 +396,21 @@ import {
     selectedAPIDetail
 } from './composables/detailManager'
 
-import CommandSelectionModal from './components/RunCommandModal.vue';
-import APIDetailModal from './components/APIDetailModal.vue'
+import {
+    selectedLibrary,
+    isRunningFix,
+    fixProgressStep,
+    fixProgress,
+    fixError,
+    getSelectedLibraryInfo,
+    runFixCommand
+} from './composables/fixManager'
 
-import { showNotification } from './composables/utils'
+import CommandSelectionModal from './components/RunCommandModal.vue';
+import APIDetailModal from './components/APIDetailModal.vue';
+import EnvironmentImportModal from './components/EnvironmentImportModal.vue';
+import EnvironmentDetailsModal from './components/EnvironmentDetailsModal.vue';
+import { showNotification } from './composables/utils';
 
 // 项目视图状态
 const projectView = ref('project')
@@ -480,15 +419,6 @@ const projectView = ref('project')
 const editorRef = ref(null)
 let editor = null
 let handleKeyDown = null
-
-// 修复库相关
-const selectedLibrary = ref(null)
-
-// 修复进度相关
-const isRunningFix = ref(false)
-const fixProgressStep = ref('Initializing')
-const fixProgress = ref(0)
-const fixError = ref('')
 
 const handleSelectedLibrary = computed({
     get(){
@@ -508,90 +438,6 @@ const handleSelectedLibrary = computed({
     }
     }
 })
-
-const getSelectedLibraryInfo = () =>{
-    if(selectedLibrary.value){
-        return `${selectedLibrary.value.name}: ${selectedLibrary.value.currentVersion} -> ${selectedLibrary.value.targetVersion}`
-    }
-    return ''
-}
-
-// 运行修复命令
-const runFixCommand = async() => {
-    const configData = {
-        projectName: project.value,
-        libName: selectedLibrary.value.name,
-        currentVersion: selectedLibrary.value.currentVersion,
-        targetVersion: selectedLibrary.value.targetVersion,
-        runCommand: runCommand.value,
-        runFilePath: runFilePath.value
-    }
-
-    isRunningFix.value = true;
-    fixError.value = '';
-    fixProgress.value = 0;
-    fixProgressStep.value = 'Starting fix process';
-
-    try{
-        const response = await fetch('http://localhost:5000/fix/run_fix',{
-            method:'POST',
-            'headers':{
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(configData)
-        });
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-
-        // 持续获取修复进度
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n');
-
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    try {
-                        const data = JSON.parse(line.substring(6));
-
-                        if (data.status === 'progress') {
-                            fixProgressStep.value = data.step;
-                            fixProgress.value = data.progress;
-                        } else if (data.status === 'error') {
-                            fixError.value = data.message.replace(/\u001b\[[0-9;]*m/g, '');  // 去除ANSI控制字符
-                            isRunningFix.value = false;
-                            showNotification(`Fix failed: ${data.message}`, 'error');
-                            return;
-                        } else if (data.status === 'success') {
-                            fixProgress.value = 100;
-                            fixProgressStep.value = data.message;
-
-                            await loadProjectTree(project.value)
-
-                            setTimeout(() => {
-                                showNotification('Fix completed successfully', 'success');
-                            }, 1000);
-
-                            fixCompleted.value = true;
-                            isRunningFix.value = false;
-                            return;
-                        }
-                    } catch (e) {
-                        console.error('Error parsing fix progress JSON:', e);
-                    }
-                }
-            }
-        }
-    }catch(error){
-        fixError.value = error.message;
-        isRunningFix.value = false;
-        console.error('Failed to run fix with progress', error);
-        showNotification('Failed to run fix:' + error.message, 'error');
-    }
-}
 
 const getRowClass = (api) => {
   if (api.coverage === 'No' || api.coverage === 'no' || api.coverage === false) {
