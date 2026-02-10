@@ -125,7 +125,7 @@
                                 </div>
                                 <div class="stat-card">
                                     <h4>Uncovered APIs</h4>
-                                    <p class="stat-number">{{ (reportData.stat_info.total_api_number - reportData.stat_info.covered_number) || 0 }}</p>
+                                    <p class="stat-number">{{ (reportData.stat_info.not_covered_number) || 0 }}</p>
                                 </div>
                             </div>
                             

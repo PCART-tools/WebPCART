@@ -48,16 +48,16 @@ class ReportParser:
                 
             # 逐个测试每个正则表达式
             patterns = {
-                'total_file_number': r'Total File Number: (\d+)',
-                'total_api_number': r'Total [^:]+ Invoked API Number: (\d+)',
-                'not_covered_number': r'Not Covered [^:]+ Invoked API Number: (\d+)/(\d+)',
-                'covered_number': r'Covered [^:]+ Invoked API Number: (\d+)/(\d+)',
-                'compatible_number': r'Compatible [^:]+ Invoked API Number: (\d+)/(\d+)',
-                'unknown_compatible_number': r'Unknown Compatible [^:]+ Invoked API Number: (\d+)/(\d+)',
-                'incompatible_number': r'Incompatible [^:]+ Invoked API Number: (\d+)/(\d+)',
-                'successfully_repaired_number': r'-> Successfully Repaired [^:]+ Invoked API number: (\d+)/(\d+)',
-                'failed_repair_number': r'-> Failed to Repair [^:]+ Invoked API Number: (\d+)/(\d+)',
-                'unknown_repair_status_number': r'-> Unknown Repair Status [^:]+ Invoked API Number: (\d+)/(\d+)'
+                'total_file_number': r'(?:^|\n)Total File Number: (\d+)',
+                'total_api_number': r'(?:^|\n)Total [^:]+ Invoked API Number: (\d+)',
+                'not_covered_number': r'(?:^|\n)Not Covered [^:]+ Invoked API Number: (\d+)/\d+',
+                'covered_number': r'(?:^|\n)Covered (?![^:]*Not )[^:]+ Invoked API Number: (\d+)/\d+',
+                'compatible_number': r'(?:^|\n)Compatible [^:]+ Invoked API Number: (\d+)/\d+',
+                'unknown_compatible_number': r'(?:^|\n)Unknown Compatible [^:]+ Invoked API Number: (\d+)/\d+',
+                'incompatible_number': r'(?:^|\n)Incompatible [^:]+ Invoked API Number: (\d+)/\d+',
+                'successfully_repaired_number': r'-> Successfully Repaired [^:]+ Invoked API number: (\d+)/\d+',
+                'failed_repair_number': r'-> Failed to Repair [^:]+ Invoked API Number: (\d+)/\d+',
+                'unknown_repair_status_number': r'-> Unknown Repair Status [^:]+ Invoked API Number: (\d+)/\d+'
             }
             
             for key, pattern in patterns.items():
@@ -78,6 +78,18 @@ class ReportParser:
     
     # 解析API详细信息
     def _parse_api_calls(self, content: str) -> List[Dict[str, Any]]:
+        # 清理匹配信息
+        def clean_field_content(content):
+            # 将换行替换为空格
+            cleaned = re.sub(r'\s*\|\s*\n\s*\|\s*', '', content, flags=re.DOTALL)
+            # 移除剩余的换行符和|符号
+            cleaned = re.sub(r'\n\s*\|\s*', '', cleaned, flags=re.DOTALL)
+            # 清理多余的空格
+            cleaned = ' '.join(cleaned.split())
+            # 移除末尾的|符号
+            cleaned = re.sub(r'\s*\|$', '', cleaned)
+            return cleaned.strip()
+        
         api_calls = []
 
         # 分割每个API调用块
@@ -86,24 +98,35 @@ class ReportParser:
         logger.info(f"api_blocks size: {len(api_blocks)}")
         
         for block in api_blocks[1:]:
-            # 查找API调用行
-            invoked_api_match = re.search(r'\| Invoked API #\d+: ([^\n\r]+)', block)
+            # 匹配API调用
+            invoked_api_match = re.search(r'\| Invoked API #\d+: (.*?)(?=\n\|\s+\||\n\|-{94}\||$)', block, re.DOTALL)
             if not invoked_api_match:
                 continue
                 
-            invoked_api = invoked_api_match.group(1).strip().replace('|', '').strip()
+            raw_api_call = invoked_api_match.group(1)
+            invoked_api = clean_field_content(raw_api_call)
             
-            # 查找位置信息
-            location_match = re.search(r'Location: At Line (.+?) in (.+)', block)
+            # 匹配API调用位置
+            location_match = re.search(r'Location: (.*?)(?=\n\|\s+\||\n\|-{94}\||$)', block, re.DOTALL)
             location = ""
             if location_match:
-                line_num = location_match.group(1).strip()
-                file_path = location_match.group(2).strip().rstrip('|').strip()
-                location = f"{line_num} in {file_path}"
+                raw_location = location_match.group(1)
+                clean_location = clean_field_content(raw_location)
+                
+                location_parts = re.search(r'At Line (.+?) in (.+)', clean_location)
+                if location_parts:
+                    line_num = location_parts.group(1).strip()
+                    file_path_extracted = location_parts.group(2).strip()
+                    location = f"{line_num} in {file_path_extracted}"
+                else:
+                    location = clean_location
             
-            # 查找覆盖
-            coverage_match = re.search(r'Coverage: (.+)', block)
-            coverage = coverage_match.group(1).strip().rstrip('|').strip()
+            # 匹配覆盖信息
+            coverage_match = re.search(r'Coverage: (.*?)(?=\n\|\s+\||\n\|-{94}\||$)', block, re.DOTALL)
+            coverage = ""
+            if coverage_match:
+                raw_coverage = coverage_match.group(1)
+                coverage = clean_field_content(raw_coverage)
 
             api_call_dict = {
                 'invoked_api': invoked_api,
@@ -112,36 +135,44 @@ class ReportParser:
             }
 
             if coverage == 'Yes':  
-                # 查找版本定义
-                def_matches = re.findall(r'Definition @[^<]+ <\w+>: (\{.*?\}|\(.*?\))', block, re.DOTALL)
-                def1 = def_matches[0].strip()
-                def1 = re.sub(r'\s*\|\s*\n\s*\|\s*', '', def1).rstrip('|').strip()
-                def2 = def_matches[1].strip()
-                def2 = re.sub(r'\s*\|\s*\n\s*\|\s*', '', def2).rstrip('|').strip()
+                # 匹配版本定义
+                all_defs = []
+                for match in re.finditer(r'Definition @.*?<.*?>: (.*?)(?=\n\|\s+\||\n\|-{94}\||$)', block, re.DOTALL):
+                    raw_def = match.group(1)
+                    clean_def = clean_field_content(raw_def)
+                    all_defs.append(clean_def)
                 
-                # 查找兼容性状态
-                compatible_match = re.search(r'Compatible: (.+)', block)
-                compatible_str = compatible_match.group(1).strip().rstrip('|').strip()
+                if len(all_defs) >= 2:
+                    def1 = all_defs[0]
+                    def2 = all_defs[1]
+                    
+                    # 匹配兼容性信息
+                    compatible_match = re.search(r'Compatible: (.*?)(?=\n\|\s+\||\n\|-{94}\||$)', block, re.DOTALL)
+                    compatible_str = ""
+                    if compatible_match:
+                        raw_compatible = compatible_match.group(1)
+                        compatible_str = clean_field_content(raw_compatible)
 
-                logger.info(compatible_str)
+                    logger.info(compatible_str)
 
-                compatible = compatible_str.lower() == 'yes'
-                
-                # 查找修复信息
-                if compatible == False:
-                    repair_match = re.search(r'Repair <(Successful|Failed|Unknown)>: (.+)', block)
-                    repair_status = None
-                    repair_result = ""
-                    if repair_match:
-                        repair_status = repair_match.group(1).lower()
-                        repair_result = repair_match.group(2).strip().rstrip('|').strip()
+                    compatible = compatible_str.lower() == 'yes'
+                    
+                    # 匹配修复信息
+                    if not compatible:
+                        repair_match = re.search(r'Repair <(Successful|Failed|Unknown)>: (.*?)(?=\n\|\s+\||\n\|-{94}\||$)', block, re.DOTALL)
+                        repair_status = None
+                        repair_result = ""
+                        if repair_match:
+                            repair_status = repair_match.group(1).lower()
+                            raw_repair_result = repair_match.group(2)
+                            repair_result = clean_field_content(raw_repair_result)
             
             if coverage == 'Yes':
                 api_call_dict['definition_v1'] = def1
                 api_call_dict['definition_v2'] = def2
                 api_call_dict['compatible'] = compatible
 
-                if compatible == False and repair_status:
+                if not compatible and repair_status:
                     api_call_dict['repair_status'] = repair_status
                     api_call_dict['repair_result'] = repair_result
             

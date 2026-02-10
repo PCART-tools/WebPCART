@@ -88,7 +88,7 @@ def run_fix():
             #         rel_path = os.path.relpath(os.path.join(root, file), final_project_path)
             #         original_files.add(rel_path)
             
-            # yield f"data: {json.dumps({'status': 'progress', 'step': 'Running the repair program', 'progress': 45})}\n\n"
+            yield f"data: {json.dumps({'status': 'progress', 'step': 'Running the repair program', 'progress': 45})}\n\n"
             
             # 构建修复命令
             pcart_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'pcart', 'main.py')

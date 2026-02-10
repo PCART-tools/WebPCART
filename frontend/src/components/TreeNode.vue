@@ -168,19 +168,6 @@ const loadFileContent = async () => {    // 加载文件内容
                     window.editor.setValue(result.content);
                     isContentModified.value = false;
                     window.editor.updateOptions({readOnly: false});
-
-                    setTimeout(() => {
-                        if (window.editor && result.content) {
-                            window.editor.layout();
-
-                            const editorContainer = document.querySelector('.editor-container');
-                            if (editorContainer) {
-                                editorContainer.style.visibility = 'visible';
-                                editorContainer.style.height = 'auto';
-                                editorContainer.style.overflow = 'visible';
-                            }
-                        }
-                    }, 50);
                 }
             }else{
                 showNotification('Failed to load file' + result.message , 'error');
