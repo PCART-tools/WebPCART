@@ -1,5 +1,6 @@
 import { computed, ref, reactive } from 'vue'
 import { showNotification } from './utils'
+import { resetFixState } from './fixManager'
 
 // 虚拟环境相关状态
 const showImportModal = ref(false)
@@ -87,17 +88,20 @@ export const createEnvironment = async() => {
     }
     
     if(selectedEnvType.value === 'current'){
+        currentEnv.value.path = '';
         isCreatingCurrentEnv.value = true;
         currentEnvCreationError.value = '';
         currentEnvCreationProgress.value = 0;
         currentCreatingEnvStep.value = 'Creating virtual environment'
     }else{
+        targetEnv.value.path = '';
         isCreatingTargetEnv.value = true;
         targetEnvCreationError.value = '';
         targetEnvCreationProgress.value = 0;
         targetCreatingEnvStep.value = 'Creating virtual environment' 
     }
     
+    resetFixState();
 
     try{
         const formData = new FormData();

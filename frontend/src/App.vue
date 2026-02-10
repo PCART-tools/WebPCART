@@ -257,9 +257,9 @@
                 </div>
 
                 <button class="run-button" 
-                        :disabled="!project || !selectedLibrary || !runCommand"
+                        :disabled="!project || !selectedLibrary || !runCommand || fixCompleted"
                         @click="runFixCommand()">
-                    {{ isRunningFix ? 'Running...' : 'Run' }}
+                    {{ isRunningFix ? 'Running...' : (fixCompleted ? 'Fix Completed' : 'Run') }}
                 </button>    
                 
                 <div v-if="isRunningFix" class="fix-progress-container">
