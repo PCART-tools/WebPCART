@@ -40,6 +40,12 @@ def get_work_dir():
         os.path.join(os.path.dirname(__file__), '..', config['fix_work_dir'])
     )
 
+def get_report_path():
+    return os.path.join(get_work_dir(), 'Report')
+
+def get_copy_path():
+    return os.path.join(get_work_dir(), 'Copy')
+
 def get_conda_path():
         return config['conda_path']
 
@@ -47,6 +53,8 @@ required_dirs = [
     get_project_base_path(),
     get_config_base_path(),
     get_env_base_path(), 
+    get_report_path(),
+    get_copy_path()
 ]
 
 # 检查并初始化数据目录

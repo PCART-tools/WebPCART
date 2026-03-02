@@ -7,8 +7,8 @@ const project = ref(null)
 const fileTree = ref(null)
 
 const fixCompleted = ref(false)
-const fixedProject = ref(null)
-const fixedFileTree = ref(null)
+const instrumentProject = ref(null)
+const instrumentFileTree = ref(null)
 
 const currentProjectType = ref('original')
 const uploadProgress = ref(0)
@@ -55,7 +55,7 @@ export const selectFolder = async() => {
             
             runCommand.value = null;
             fixCompleted.value = false;
-            clearFixedProject();
+            clearinstrumentProject();
             await setProject(folderName);
             await uploadFiles(folderName, files);
         };
@@ -202,8 +202,8 @@ export const loadProjectTree = async(projectName, type = 'original') => {
         if(result.status === 'success'){
             if(type == 'original'){
                 fileTree.value = result.tree;
-            }else if(type == 'fixed'){
-                fixedFileTree.value = result.tree;
+            }else if(type == 'instrument'){
+                instrumentFileTree.value = result.tree;
             }
             
             if(!currentFilePath.value && window.editor){
@@ -278,28 +278,28 @@ export const downloadProject = async(projectType = 'original') => {
 }
 
 // 设置修复后的项目
-export const setFixedProject = async(path) => {
+export const setCopyProject = async(path) => {
     try{
-        fixedProject.value = path;
-        await loadProjectTree(path, 'fixed');
+        instrumentProject.value = path;
+        await loadProjectTree(path, 'instrument');
     }catch(error){
-        console.error('Error setting fixed project:', error);
-        showNotification('Failed to set fixed project', 'error');
+        console.error('Error setting instrument project:', error);
+        showNotification('Failed to set instrument project', 'error');
     }
 }
 
 // 清空修复后的项目数据
-export const clearFixedProject = () => {
-    fixedProject.value = null;
-    fixedFileTree.value = null;
+export const clearinstrumentProject = () => {
+    instrumentProject.value = null;
+    instrumentFileTree.value = null;
 }
 
 // 导出相关状态
 export {
     project,
     fileTree,
-    fixedProject,
-    fixedFileTree,
+    instrumentProject,
+    instrumentFileTree,
     uploadProgress,
     isUploading,
     totalBatches,

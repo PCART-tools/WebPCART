@@ -3,7 +3,7 @@ import os
 import json
 import zipfile
 from io import BytesIO
-from ..common import get_logger, get_project_base_path, get_fixed_project_base_path
+from ..common import get_logger, get_project_base_path, get_fixed_project_base_path, get_copy_path
 
 logger = get_logger('project')
 project_bp = Blueprint('project', __name__)
@@ -11,6 +11,7 @@ project_bp = Blueprint('project', __name__)
 # 读取配置
 PROJECTS_ROOT = get_project_base_path()
 FIXED_PROJECTS_ROOT = get_fixed_project_base_path()
+COPY_PROJECTS_ROOT = get_copy_path()
 
 project = None
 
@@ -118,8 +119,8 @@ def get_project_tree():
     
     if project_type == 'original':
         root_path = os.path.join(PROJECTS_ROOT, project_name)
-    elif project_type == 'fixed':
-        root_path = os.path.join(FIXED_PROJECTS_ROOT, project_name)
+    elif project_type == 'instrument':
+        root_path = os.path.join(COPY_PROJECTS_ROOT, project_name)
 
     if not os.path.exists(root_path):
         return jsonify({
@@ -173,8 +174,8 @@ def download_file():
                 "status": "error"
             }), 400
         
-        if project_type == 'fixed':
-            project_dir = os.path.join(FIXED_PROJECTS_ROOT, project_name)
+        if project_type == 'instrument':
+            project_dir = os.path.join(COPY_PROJECTS_ROOT, project_name)
         else:
             project_dir = os.path.join(PROJECTS_ROOT, project_name)
         
@@ -227,8 +228,8 @@ def get_file_content():
                 "status": "error"
             }), 400
         
-        if project_type == 'fixed':
-            project_dir = os.path.join(FIXED_PROJECTS_ROOT, project_name)
+        if project_type == 'instrument':
+            project_dir = os.path.join(COPY_PROJECTS_ROOT, project_name)
         else:
             project_dir = os.path.join(PROJECTS_ROOT, project_name)
         
@@ -274,8 +275,8 @@ def save_file():
                 "status": "error"
             }), 400
         
-        if project_type == 'fixed':
-            project_dir = os.path.join(FIXED_PROJECTS_ROOT, project_name)
+        if project_type == 'instrument':
+            project_dir = os.path.join(COPY_PROJECTS_ROOT, project_name)
         else:
             project_dir = os.path.join(PROJECTS_ROOT, project_name)
             

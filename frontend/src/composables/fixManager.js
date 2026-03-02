@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { project, loadProjectTree, fixCompleted } from './projectManager'
+import { project, loadProjectTree, fixCompleted, setCopyProject } from './projectManager'
 import { runCommand, runFilePath } from './configManager'
 import { showNotification } from './utils'
 
@@ -84,6 +84,7 @@ export const runFixCommand = async() => {
                             fixProgressStep.value = data.message;
 
                             await loadProjectTree(project.value)
+                            await setCopyProject(project.value)
 
                             setTimeout(() => {
                                 showNotification('Fix completed successfully', 'success');

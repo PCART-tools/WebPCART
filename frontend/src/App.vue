@@ -61,19 +61,19 @@
                         </div> 
                     </div>  
 
-                    <!-- <div v-if="!isUploading && fixedProject" class="divider-line"></div>
+                    <div v-if="!isUploading && instrumentProject" class="divider-line"></div>
 
-                    <div v-if="!isUploading && fixedProject" class="project">
+                    <div v-if="!isUploading && instrumentProject" class="project">
                         <div class="project-header">
-                            <span class="project-path">{{project}} -fixed</span>
-                            <button class="downloadProject" title="Download Project" @click="downloadProject('fixed')">
+                            <span class="project-path">{{project}} -instrument</span>
+                            <button class="downloadProject" title="Download Project" @click="downloadProject('instrument')">
                                 <i class="fas fa-download"></i>
                             </button>
                         </div>
-                        <div v-if="fixedFileTree" class="file-tree">
-                            <tree-view :tree-data="fixedFileTree" :project-name="fixedProject" project-type="fixed"/>
+                        <div v-if="instrumentFileTree" class="file-tree">
+                            <tree-view :tree-data="instrumentFileTree" :project-name="instrumentProject" project-type="instrument"/>
                         </div> 
-                    </div>  -->
+                    </div> 
                 </div>
 
                 <div v-show="projectView === 'detail'" class="detail-content">
@@ -336,6 +336,8 @@ import TreeView from './components/TreeView.vue'
 import { 
     project, 
     fileTree, 
+    instrumentProject,
+    instrumentFileTree,
     uploadProgress, 
     isUploading, 
     currentFilePath, 
