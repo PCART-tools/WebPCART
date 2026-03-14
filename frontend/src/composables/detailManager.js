@@ -21,7 +21,7 @@ export const getReport = async () => {
     isGeneratingReport.value = true;
 
     const encodedProjectName = encodeURIComponent(project.value);
-    const response = await fetch(`http://localhost:5000/report/${encodedProjectName}`, {
+    const response = await fetch(`/report/${encodedProjectName}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json'

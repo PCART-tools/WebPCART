@@ -93,7 +93,7 @@ const downloadItem = async () => {   // 下载文件
     try{
         const fullPath = getCurrentPath();
 
-        const response = await fetch(`http://localhost:5000/project/download`, {
+        const response = await fetch(`/project/download`, {
             method: 'POST',
             headers:{
                 'Content-Type':'application/json'
@@ -147,7 +147,7 @@ const buildPath = (node) => {    // 构建文件路径
 const loadFileContent = async () => {    // 加载文件内容
     try{
         const fullPath = getCurrentPath();
-        const response = await fetch('http://localhost:5000/project/load_file', {
+        const response = await fetch('/project/load_file', {
             method: 'POST',
             headers:{
                 'Content-Type':'application/json'

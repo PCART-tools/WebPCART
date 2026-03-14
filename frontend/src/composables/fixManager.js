@@ -47,7 +47,7 @@ export const runFixCommand = async() => {
     fixProgressStep.value = 'Starting fix process';
 
     try{
-        const response = await fetch('http://localhost:5000/fix/run_fix',{
+        const response = await fetch('/fix/run_fix',{
             method:'POST',
             'headers':{
                 'Content-Type': 'application/json'

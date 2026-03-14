@@ -115,7 +115,7 @@ export const createEnvironment = async() => {
             formData.append('condapack', condapackFile.value);
         }
 
-        const response = await fetch('http://localhost:5000/venv/create', {
+        const response = await fetch('/venv/create', {
             method: 'POST',
             body: formData
         })

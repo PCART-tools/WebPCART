@@ -101,7 +101,7 @@ export const uploadFiles = async(projectName, files) => {
                 formData.append(`paths[${i}]`, relativePath);
             }
 
-            const response = await fetch('http://localhost:5000/project/upload_batch', {
+            const response = await fetch('/project/upload_batch', {
                 method: 'POST',
                 body: formData
             });
@@ -137,7 +137,7 @@ export const saveFile = async(projectType = 'original') => {
     try{
         const currentContent = window.editor.getValue();
 
-        const response = await fetch('http://localhost:5000/project/save_file', {
+        const response = await fetch('/project/save_file', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -167,7 +167,7 @@ export const saveFile = async(projectType = 'original') => {
 // 添加项目到后端
 export const setProject = async(path) => {
     try{
-        const response = await fetch('http://localhost:5000/project', {
+        const response = await fetch('/project', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -190,7 +190,7 @@ export const setProject = async(path) => {
 // 加载项目树
 export const loadProjectTree = async(projectName, type = 'original') => {
     try{
-        const response = await fetch('http://localhost:5000/project/tree', {
+        const response = await fetch('/project/tree', {
             method: 'POST',
             headers:{
                 'Content-Type': 'application/json'
@@ -221,7 +221,7 @@ export const loadProjectTree = async(projectName, type = 'original') => {
 // 加载当前项目
 export const loadCurrentProject = async() => {
     try{
-        const response = await fetch('http://localhost:5000/project');
+        const response = await fetch('/project');
         const result = await response.json();
         if(result.status === 'success' && result.project){
             project.value = result.project;
@@ -243,7 +243,7 @@ export const downloadProject = async(projectType = 'original') => {
             }
         }
 
-        const response = await fetch(`http://localhost:5000/project/download`, {
+        const response = await fetch(`/project/download`, {
             method: 'POST',
             headers:{
                 'Content-Type':'application/json'

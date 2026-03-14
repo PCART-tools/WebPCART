@@ -23,7 +23,7 @@ services:
       dockerfile: Dockerfile.frontend
     container_name: webpcart-frontend
     ports:
-      - "80:80"
+      - "8080:80"
     depends_on:
       - backend
     networks:

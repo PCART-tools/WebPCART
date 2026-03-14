@@ -2,15 +2,34 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
+# 安装必要的依赖
 RUN apt-get update && apt-get install -y \
+    wget \
+    bzip2 \
+    ca-certificates \
+    libglib2.0-0 \
+    libxext6 \
+    libsm6 \
+    libxrender-dev \
+    libgomp1 \
     gcc \
     g++ \
     && rm -rf /var/lib/apt/lists/*
+
+# 下载并安装Miniconda
+RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh && \
+    bash miniconda.sh -b -p /opt/conda && \
+    rm miniconda.sh
+
+# 将conda添加到PATH
+ENV PATH="/opt/conda/bin:${PATH}"
 
 COPY backend/ ./backend/
 COPY pcart/ ./pcart/
 
 WORKDIR /app/backend
+
+# 安装Python依赖
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir flask flask-cors gunicorn
 
@@ -18,4 +37,4 @@ EXPOSE 5000
 
 RUN mkdir -p ./data/venv ./data/projects ./data/fixed_projects
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "run:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "600", "--max-requests", "1000", "--max-requests-jitter", "100", "run:app"]

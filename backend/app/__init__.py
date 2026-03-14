@@ -4,7 +4,9 @@ from flask_cors import CORS
 def create_app():
     app = Flask(__name__)
 
-    CORS(app, origins=["http://localhost:5173"])
+    app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024 * 1024
+
+    CORS(app, origins=["http://localhost:5173", "http://localhost:5000", "http://localhost", "http://127.0.0.1:5173", "http://127.0.0.1:5000", "http://127.0.0.1"])
    
     from .routes.project import project_bp
     from .routes.venv import venv_bp
