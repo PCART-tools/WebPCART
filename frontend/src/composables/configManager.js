@@ -32,6 +32,8 @@ const targetEnv = ref({
     path: ''
 })
 
+const configChanged = ref(true)
+
 // 打开导入环境窗口
 export const openImportEnvModal = (envType) => {
     selectedEnvType.value = envType;
@@ -101,6 +103,7 @@ export const createEnvironment = async() => {
         targetCreatingEnvStep.value = 'Creating virtual environment' 
     }
     
+    configChanged.value = true;
     resetFixState();
 
     try{
@@ -363,6 +366,7 @@ const closeCommandModal = () => {
 const saveCommand = (command, filePath) => {
     runCommand.value = command;
     runFilePath.value = filePath;
+    configChanged.value = true;
     closeCommandModal();
 }
 
@@ -395,6 +399,7 @@ export {
     pythonFiles,
     selectedPythonFile,
     additionalArgs,
+    configChanged,
     openCommandModal,
     closeCommandModal,
     saveCommand,

@@ -2,16 +2,17 @@ from flask import Blueprint, jsonify, request, send_from_directory, send_file
 import os
 import json
 import zipfile
+import shutil
 from io import BytesIO
-from ..common import get_logger, get_project_base_path, get_fixed_project_base_path, get_copy_path
+from ..common import get_logger, get_project_base_path, get_project_copy_path, get_instrument_path
 
 logger = get_logger('project')
 project_bp = Blueprint('project', __name__)
 
 # 读取配置
 PROJECTS_ROOT = get_project_base_path()
-FIXED_PROJECTS_ROOT = get_fixed_project_base_path()
-COPY_PROJECTS_ROOT = get_copy_path()
+PROJECTS_COPY_ROOT = get_project_copy_path()
+INSTRUMENT_PROJECTS_ROOT = get_instrument_path()
 
 project = None
 
@@ -46,7 +47,14 @@ def set_project():
             if os.path.isfile(item_path):
                 os.remove(item_path)
             elif os.path.isdir(item_path):
-                import shutil
+                shutil.rmtree(item_path)
+
+    if os.path.exists(PROJECTS_COPY_ROOT):
+        for item in os.listdir(PROJECTS_ROOT):
+            item_path = os.path.join(PROJECTS_ROOT, item)
+            if os.path.isfile(item_path):
+                os.remove(item_path)
+            elif os.path.isdir(item_path):
                 shutil.rmtree(item_path)
 
     if not os.path.exists(project_dir):
@@ -120,7 +128,7 @@ def get_project_tree():
     if project_type == 'original':
         root_path = os.path.join(PROJECTS_ROOT, project_name)
     elif project_type == 'instrument':
-        root_path = os.path.join(COPY_PROJECTS_ROOT, project_name)
+        root_path = os.path.join(INSTRUMENT_PROJECTS_ROOT, project_name)
 
     if not os.path.exists(root_path):
         return jsonify({
@@ -175,7 +183,7 @@ def download_file():
             }), 400
         
         if project_type == 'instrument':
-            project_dir = os.path.join(COPY_PROJECTS_ROOT, project_name)
+            project_dir = os.path.join(INSTRUMENT_PROJECTS_ROOT, project_name)
         else:
             project_dir = os.path.join(PROJECTS_ROOT, project_name)
         
@@ -229,7 +237,7 @@ def get_file_content():
             }), 400
         
         if project_type == 'instrument':
-            project_dir = os.path.join(COPY_PROJECTS_ROOT, project_name)
+            project_dir = os.path.join(INSTRUMENT_PROJECTS_ROOT, project_name)
         else:
             project_dir = os.path.join(PROJECTS_ROOT, project_name)
         
@@ -276,7 +284,7 @@ def save_file():
             }), 400
         
         if project_type == 'instrument':
-            project_dir = os.path.join(COPY_PROJECTS_ROOT, project_name)
+            project_dir = os.path.join(INSTRUMENT_PROJECTS_ROOT, project_name)
         else:
             project_dir = os.path.join(PROJECTS_ROOT, project_name)
             

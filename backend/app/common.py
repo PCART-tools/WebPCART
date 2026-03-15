@@ -20,9 +20,9 @@ def get_project_base_path():
         os.path.join(os.path.dirname(__file__), '..', config['project_base_path'])
     )
 
-def get_fixed_project_base_path():
+def get_project_copy_path():
      return os.path.normpath(
-         os.path.join(os.path.dirname(__file__), '..', config['fixed_project_base_path'])
+         os.path.join(os.path.dirname(__file__), '..', config['project_copy_path'])
      )
 
 def get_config_base_path():
@@ -43,21 +43,21 @@ def get_work_dir():
 def get_report_path():
     return os.path.join(get_work_dir(), 'Report')
 
-def get_copy_path():
+def get_instrument_path():
     return os.path.join(get_work_dir(), 'Copy')
 
 def get_conda_path():
-    # 优先使用环境变量
+    # 使用环境变量查找conda
     conda_path = os.environ.get('CONDA_PATH')
     if conda_path and os.path.exists(conda_path):
         return conda_path
     
-    # 检查配置文件中的路径是否存在
+    # 检查配置文件中的路径
     configured_path = config['conda_path']
     if os.path.exists(configured_path):
         return configured_path
     
-    # 尝试一些常见的conda安装路径
+    # 检查常见的conda安装路径
     common_paths = [
         '/opt/conda/bin/conda', 
         '/usr/local/miniconda/bin/conda',
@@ -65,7 +65,7 @@ def get_conda_path():
         '/home/linuxbrew/.linuxbrew/bin/conda'
     ]
     
-    # 尝试用户目录下的常见路径
+    # 检查用户目录下的常见路径
     home_dir = os.path.expanduser("~")
     user_conda_paths = [
         os.path.join(home_dir, "miniconda3", "bin", "conda"),
@@ -85,10 +85,11 @@ def get_conda_path():
 
 required_dirs = [
     get_project_base_path(),
+    get_project_copy_path(),
     get_config_base_path(),
     get_env_base_path(), 
     get_report_path(),
-    get_copy_path()
+    get_instrument_path()
 ]
 
 # 检查并初始化数据目录

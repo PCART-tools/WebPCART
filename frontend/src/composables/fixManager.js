@@ -1,6 +1,6 @@
 import { ref } from 'vue'
-import { project, loadProjectTree, fixCompleted, setCopyProject } from './projectManager'
-import { runCommand, runFilePath } from './configManager'
+import { project, loadProjectTree, fixCompleted, setInstrumentProject } from './projectManager'
+import { configChanged, runCommand, runFilePath } from './configManager'
 import { showNotification } from './utils'
 
 // 修复库相关状态
@@ -38,7 +38,8 @@ export const runFixCommand = async() => {
         currentVersion: selectedLibrary.value.currentVersion,
         targetVersion: selectedLibrary.value.targetVersion,
         runCommand: runCommand.value,
-        runFilePath: runFilePath.value
+        runFilePath: runFilePath.value,
+        fixCompleted: fixCompleted.value
     }
 
     isRunningFix.value = true;
@@ -83,13 +84,13 @@ export const runFixCommand = async() => {
                             fixProgress.value = 100;
                             fixProgressStep.value = data.message;
 
-                            await loadProjectTree(project.value)
-                            await setCopyProject(project.value)
+                            await setInstrumentProject(project.value)
 
                             setTimeout(() => {
                                 showNotification('Fix completed successfully', 'success');
                             }, 1000);
 
+                            configChanged.value = false;
                             fixCompleted.value = true;
                             isRunningFix.value = false;
                             return;

@@ -3,7 +3,7 @@
         <!-- 功能栏 -->
         <div class="function-bar">
             <b>WebPCART</b>
-            <div class="function-buttons">
+            <!-- <div class="function-buttons">
                 <button @click="showInfo('setting')" title="setting">
                     <i class="fas fa-cog"></i>
                 </button>
@@ -13,7 +13,7 @@
                 <button @click="showInfo('about')" title="about">
                     <i class="fas fa-info-circle"></i>
                 </button>
-            </div>
+            </div> -->
         </div>
 
         <!-- 网页主体 -->
@@ -257,9 +257,9 @@
                 </div>
 
                 <button class="run-button" 
-                        :disabled="!project || !selectedLibrary || !runCommand || fixCompleted"
+                        :disabled="!project || !selectedLibrary || !runCommand || !configChanged"
                         @click="runFixCommand()">
-                    {{ isRunningFix ? 'Running...' : (fixCompleted ? 'Fix Completed' : 'Run') }}
+                    {{ isRunningFix ? 'Running...' : (configChanged ? 'Run' : 'Fix Completed') }}
                 </button>    
                 
                 <div v-if="isRunningFix" class="fix-progress-container">
@@ -387,6 +387,7 @@ import {
     openCommandModal,
     closeCommandModal,
     saveCommand,
+    configChanged,
 } from './composables/configManager'
 
 import { 
@@ -435,9 +436,11 @@ const handleSelectedLibrary = computed({
                 currentVersion: selectedLib.currentVersion,
                 targetVersion: selectedLib.targetVersion
             };
-    }else{
-        selectedLibrary.value = null;
-    }
+        }else{
+            selectedLibrary.value = null;
+        }
+
+        configChanged.value = true;
     }
 })
 

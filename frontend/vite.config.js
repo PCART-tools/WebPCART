@@ -18,10 +18,25 @@ export default defineConfig({
   },
   server:{
     proxy:{
-      '/api':{
-        target:'',
+      '/project':{
+        target:'http://localhost:5000',
         changeOrigin:true,
-        rewrite:(path)=>path.replace(/^\/api/,'')
+        secure: false
+      },
+      '/fix':{
+        target:'http://localhost:5000',
+        changeOrigin:true,
+        secure: false
+      },
+      '/venv':{
+        target:'http://localhost:5000',
+        changeOrigin:true,
+        secure: false
+      },
+      '/report':{
+        target:'http://localhost:5000',
+        changeOrigin:true,
+        secure: false
       }
     }
   },

@@ -1,6 +1,6 @@
 import { ref, reactive } from 'vue'
 import { showNotification } from './utils'
-import { runCommand } from './configManager'
+import { runCommand, configChanged } from './configManager'
 
 // 项目管理相关状态
 const project = ref(null)
@@ -55,6 +55,7 @@ export const selectFolder = async() => {
             
             runCommand.value = null;
             fixCompleted.value = false;
+            configChanged.value = false;
             clearinstrumentProject();
             await setProject(folderName);
             await uploadFiles(folderName, files);
@@ -278,7 +279,7 @@ export const downloadProject = async(projectType = 'original') => {
 }
 
 // 设置修复后的项目
-export const setCopyProject = async(path) => {
+export const setInstrumentProject = async(path) => {
     try{
         instrumentProject.value = path;
         await loadProjectTree(path, 'instrument');
