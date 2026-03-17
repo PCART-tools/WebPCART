@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import shutil
+from flask import g, session, request
 
 # 设置日志配置
 logging.basicConfig(level=logging.INFO)
@@ -15,15 +16,39 @@ with open(config_path, 'r', encoding='utf-8') as f:
 def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(name)
 
+def get_user_id():
+    if hasattr(g, 'user_id'):
+        return g.user_id
+    user_id = session.get('user_id')
+    if not user_id:
+        import uuid
+        user_id = str(uuid.uuid4())
+        session['user_id'] = user_id
+        g.user_id = user_id
+    return user_id
+
+
 def get_project_base_path():
-    return os.path.normpath(
+    user_id = get_user_id()
+    base_path = os.path.normpath(
         os.path.join(os.path.dirname(__file__), '..', config['project_base_path'])
     )
+    
+    user_project_path = os.path.join(base_path, user_id)
+    if not os.path.exists(user_project_path):
+        os.makedirs(user_project_path, exist_ok=True)
+    return user_project_path
 
 def get_project_copy_path():
-     return os.path.normpath(
-         os.path.join(os.path.dirname(__file__), '..', config['project_copy_path'])
-     )
+    user_id = get_user_id()
+    base_path = os.path.normpath(
+        os.path.join(os.path.dirname(__file__), '..', config['project_copy_path'])
+    )
+    
+    user_copy_path = os.path.join(base_path, user_id)
+    if not os.path.exists(user_copy_path):
+        os.makedirs(user_copy_path, exist_ok=True)
+    return user_copy_path
 
 def get_config_base_path():
     return os.path.normpath(
@@ -31,20 +56,48 @@ def get_config_base_path():
     )
 
 def get_env_base_path():
-    return os.path.normpath(
+    user_id = get_user_id()
+    base_path = os.path.normpath(
         os.path.join(os.path.dirname(__file__), '..', config['env_base_path'])
     )
+    
+    user_env_path = os.path.join(base_path, user_id)
+    if not os.path.exists(user_env_path):
+        os.makedirs(user_env_path, exist_ok=True)
+    return user_env_path
+
+def get_report_base_path():
+    user_id = get_user_id()
+    base_path = os.path.normpath(
+        os.path.join(os.path.dirname(__file__), '..', config['report_base_path'])
+    )
+    
+    user_report_path = os.path.join(base_path, user_id)
+    if not os.path.exists(user_report_path):
+        os.makedirs(user_report_path, exist_ok=True)
+    return user_report_path
+
+def get_instrument_base_path():
+    user_id = get_user_id()
+    base_path = os.path.normpath(
+        os.path.join(os.path.dirname(__file__), '..', config['project_instrument_path'])
+    )
+    
+    user_instrument_path = os.path.join(base_path, user_id)
+    if not os.path.exists(user_instrument_path):
+        os.makedirs(user_instrument_path, exist_ok=True)
+    return user_instrument_path
 
 def get_work_dir():
     return os.path.normpath(
         os.path.join(os.path.dirname(__file__), '..', config['fix_work_dir'])
     )
 
-def get_report_path():
-    return os.path.join(get_work_dir(), 'Report')
+# def get_report_path():
+#     return os.path.join(get_work_dir(), 'Report')
 
-def get_instrument_path():
-    return os.path.join(get_work_dir(), 'Copy')
+# def get_instrument_path():
+#     return os.path.join(get_work_dir(), 'Copy')
 
 def get_conda_path():
     # 使用环境变量查找conda
@@ -83,34 +136,48 @@ def get_conda_path():
     # 如果所有路径都不存在，返回配置文件中的原始路径
     return configured_path
 
-required_dirs = [
-    get_project_base_path(),
-    get_project_copy_path(),
-    get_config_base_path(),
-    get_env_base_path(), 
-    get_report_path(),
-    get_instrument_path()
-]
-
-# 检查并初始化数据目录
-def initialize_directories():
-    for directory in required_dirs:
-        if not os.path.exists(directory):
-            # 目录不存在，创建目录
-            os.makedirs(directory, exist_ok=True)
-            logger.info(f"Created directory: {directory}")
-        else:
-            # 目录存在，清空目录内容
-            try:
-                for item in os.listdir(directory):
-                    item_path = os.path.join(directory, item)
-                    if os.path.isfile(item_path):
-                        os.remove(item_path)
+def clean_directories():
+    # 获取基础路径
+    base_backend_path = os.path.join(os.path.dirname(__file__), '..')
+    base_pcart_path = os.path.normpath(os.path.join(os.path.dirname(__file__), config['fix_work_dir']))
+    
+    directories_to_clean = [
+        os.path.join(base_backend_path, config['project_base_path']),  # ./data/projects
+        os.path.join(base_backend_path, config['project_copy_path']),  # ./data/projects_copy
+        os.path.join(base_backend_path, config['report_base_path']),   # ./data/reports
+        os.path.join(base_backend_path, config['project_instrument_path']),  # ./data/projects_instrument
+        os.path.join(base_pcart_path, 'Configure'),  # ../pcart/Configure
+        os.path.join(base_pcart_path, 'Copy'),       # ../pcart/Copy
+        os.path.join(base_pcart_path, 'Report')      # ../pcart/Report
+    ]
+    
+def clean_directories():
+    # 获取基础路径
+    base_backend_path = os.path.join(os.path.dirname(__file__), '..')
+    base_pcart_path = os.path.normpath(os.path.join(os.path.dirname(__file__), config['fix_work_dir']))
+    
+    directories_to_clean = [
+        os.path.join(base_backend_path, config['project_base_path']), 
+        os.path.join(base_backend_path, config['project_copy_path']),  
+        os.path.join(base_backend_path, config['report_base_path']),  
+        os.path.join(base_backend_path, config['project_instrument_path']), 
+        os.path.join(base_pcart_path, 'Configure'),  
+        os.path.join(base_pcart_path, 'Copy'),       
+        os.path.join(base_pcart_path, 'Report')      
+    ]
+    
+    logger.info("Starting server data cleanup")
+    for directory in directories_to_clean:
+        if os.path.exists(directory):
+            for item in os.listdir(directory):
+                item_path = os.path.join(directory, item)
+                try:
+                    if os.path.isfile(item_path) or os.path.islink(item_path):
+                        os.unlink(item_path)  
                     elif os.path.isdir(item_path):
-                        shutil.rmtree(item_path)
-                logger.info(f"Cleared directory: {directory}")
-            except Exception as e:
-                logger.warning(f"Could not clear directory {directory}: {str(e)}")
-
-
-initialize_directories()
+                        shutil.rmtree(item_path)  
+                except Exception as e:
+                    logger.error(f"Error deleting {item_path}: {e}")
+            logger.info(f"Completed cleaning directory: {directory}")
+        else:
+            logger.warning(f"Directory does not exist, skipping cleanup: {directory}")

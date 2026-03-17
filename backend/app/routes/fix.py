@@ -4,22 +4,26 @@ import json
 import subprocess
 import shutil
 import time
-from ..common import get_logger, get_config_base_path, get_env_base_path, get_project_base_path, get_project_copy_path, get_work_dir
+from ..common import get_logger, get_config_base_path, get_env_base_path, get_project_base_path, get_project_copy_path, get_report_base_path, get_work_dir, get_instrument_base_path
 
 logger = get_logger('fix')
 fix_bp = Blueprint('fix', __name__)
 
-# 读取配置文件
-CONFIG_BASE_PATH = get_config_base_path()
-ENV_BASE_PATH = get_env_base_path()
-PROJECT_BASE_PATH = get_project_base_path()
-PROJECT_COPY_PATH = get_project_copy_path()
 WORK_DIR = get_work_dir()
+CONFIG_BASE_PATH = get_config_base_path()
+# 读取配置文件
+def get_paths():
+    ENV_BASE_PATH = get_env_base_path()
+    PROJECT_BASE_PATH = get_project_base_path()
+    PROJECT_COPY_PATH = get_project_copy_path()
+    REPORT_BASE_PATH = get_report_base_path()
+    INSTRUMENT_BASE_PATH = get_instrument_base_path()
+    return ENV_BASE_PATH, PROJECT_BASE_PATH, PROJECT_COPY_PATH, REPORT_BASE_PATH, INSTRUMENT_BASE_PATH
 
 # 生成配置文件
-def generate_fix_config(projectName, selectedLibrary, fix_command, run_file_path, project_path):
-    current_env = os.path.join(ENV_BASE_PATH, 'current')
-    target_env = os.path.join(ENV_BASE_PATH, 'target')
+def generate_fix_config(projectName, selectedLibrary, fix_command, run_file_path, project_path, env_base_path):
+    current_env = os.path.join(env_base_path, 'current')
+    target_env = os.path.join(env_base_path, 'target')
     
     config_content = {
         'projPath': project_path,
@@ -54,12 +58,15 @@ def run_fix():
     run_file_path = data['runFilePath']
     fix_completed = data.get('fixCompleted', False)
 
+    ENV_BASE_PATH, PROJECT_BASE_PATH, PROJECT_COPY_PATH, REPORT_BASE_PATH, INSTRUMENT_BASE_PATH= get_paths()
+
     def generate():
         try:
             # 构建配置文件
             yield f"data: {json.dumps({'status': 'progress', 'step': 'Building the configuration file', 'progress': 10})}\n\n"
 
             project_path = os.path.join(PROJECT_BASE_PATH, project_name)
+            config_file_path = generate_fix_config(project_name, selected_library, run_command, run_file_path, project_path, ENV_BASE_PATH)
 
             if fix_completed:
                 # 获取项目备份
@@ -97,8 +104,6 @@ def run_fix():
                     logger.error(error_msg)
                     yield f"data: {json.dumps({'status': 'error', 'message': error_msg})}\n\n"
                     return
-
-            config_file_path = generate_fix_config(project_name, selected_library, run_command, run_file_path, project_path)
             
             yield f"data: {json.dumps({'status': 'progress', 'step': 'Running the repair program', 'progress': 45})}\n\n"
             
@@ -141,6 +146,37 @@ def run_fix():
                 logger.info(f"PCART repair successful")
                 
                 yield f"data: {json.dumps({'status': 'progress', 'step': 'Post-processing results', 'progress': 80})}\n\n"
+                
+                # 将报告复制到用户的报告目录中
+                try:
+                    original_report_path = os.path.join(WORK_DIR, 'Report', f'{project_name}.txt')
+                    user_report_path = os.path.join(REPORT_BASE_PATH, f'{project_name}.txt')
+                    
+                    if os.path.exists(original_report_path):
+                        os.makedirs(REPORT_BASE_PATH, exist_ok=True)
+                        shutil.copy2(original_report_path, user_report_path)
+                        logger.info(f"Report copied from {original_report_path} to {user_report_path}")
+                    else:
+                        logger.warning(f"Original report file not found: {original_report_path}")
+                except Exception as e:
+                    logger.error(f"Error copying report: {str(e)}")
+
+                # 将插桩后的项目复制到用户的插桩目录中
+                try:
+                    original_instrument_path = os.path.join(WORK_DIR, 'Copy', project_name)
+                    user_instrument_path = os.path.join(INSTRUMENT_BASE_PATH, project_name)
+                    
+                    if os.path.exists(original_instrument_path):
+                        if os.path.exists(user_instrument_path):
+                            shutil.rmtree(user_instrument_path)
+                        
+                        os.makedirs(INSTRUMENT_BASE_PATH, exist_ok=True)
+                        shutil.copytree(original_instrument_path, user_instrument_path)
+                        logger.info(f"Instrument project copied from {original_instrument_path} to {user_instrument_path}")
+                    else:
+                        logger.warning(f"Original instrument project not found: {original_instrument_path}")
+                except Exception as e:
+                    logger.error(f"Error copying instrument project: {str(e)}")
                 
                 yield f"data: {json.dumps({'status': 'progress', 'step': 'Finalizing results', 'progress': 95})}\n\n"
                 time.sleep(0.5)

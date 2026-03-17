@@ -3,7 +3,7 @@ import os
 import re
 from typing import Dict, List, Any
 
-from ..common import get_logger, get_work_dir
+from ..common import get_logger, get_work_dir, get_report_base_path
 
 logger = get_logger('report')
 report_bp = Blueprint('report', __name__)
@@ -180,35 +180,42 @@ class ReportParser:
 
         return api_calls
     
-    # 根据条件过滤数据
-    def filter_data(self, filters: Dict[str, Any]) -> Dict[str, Any]:
-        parsed_data = self.parse_report()
+    # # 根据条件过滤数据
+    # def filter_data(self, filters: Dict[str, Any]) -> Dict[str, Any]:
+    #     parsed_data = self.parse_report()
         
-        filtered_details = parsed_data['api_details']
+    #     filtered_details = parsed_data['api_details']
         
-        # 按兼容性状态过滤
-        if 'compatibility_status' in filters:
-            status = filters['compatibility_status']
-            if status in ['compatible', 'incompatible', 'unknown']:
-                filtered_details = [
-                    detail for detail in filtered_details
-                    if detail['compatibility_status'] == status
-                ]
+    #     # 按兼容性状态过滤
+    #     if 'compatibility_status' in filters:
+    #         status = filters['compatibility_status']
+    #         if status in ['compatible', 'incompatible', 'unknown']:
+    #             filtered_details = [
+    #                 detail for detail in filtered_details
+    #                 if detail['compatibility_status'] == status
+    #             ]
 
-        return {
-            "stat_info": parsed_data['stat_info'],
-            "api_details": filtered_details
-        }
+    #     return {
+    #         "stat_info": parsed_data['stat_info'],
+    #         "api_details": filtered_details
+    #     }
     
 # 获取项目报告
 @report_bp.route('/report/<project_name>', methods=['GET'])
 def get_project_report(project_name):
     try:
         logger.info("projectName:" + project_name)
-        # 构建报告路径
-        project_reports_dir = os.path.join(get_work_dir(), 'Report')
-        report_filename = f"{project_name}.txt"
-        report_path = os.path.join(project_reports_dir, report_filename)
+
+        # 获取修复报告
+        user_report_path = os.path.join(get_report_base_path(), f"{project_name}.txt")
+        if os.path.exists(user_report_path):
+            report_path = user_report_path
+            report_filename = f"{project_name}.txt"
+        else:
+            # 如果用户报告目录中没有，尝试原始报告目录
+            project_reports_dir = os.path.join(get_work_dir(), 'Report')
+            report_filename = f"{project_name}.txt"
+            report_path = os.path.join(project_reports_dir, report_filename)
 
         logger.info("reportPath:" + report_path)
         
@@ -233,35 +240,35 @@ def get_project_report(project_name):
             "status": "error"
         }), 500
 
-# 按条件过滤报告
-@report_bp.route('/report/<project_name>/filtered', methods=['POST'])
-def get_filtered_report(project_name):
-    try:
-        filters = request.get_json()
+# # 按条件过滤报告
+# @report_bp.route('/report/<project_name>/filtered', methods=['POST'])
+# def get_filtered_report(project_name):
+#     try:
+#         filters = request.get_json()
         
-        # 构建报告路径
-        project_reports_dir = os.path.join(get_work_dir(), 'Report')
-        report_filename = f"{project_name}.txt"
-        report_path = os.path.join(project_reports_dir, report_filename)
+#         # 构建报告路径
+#         project_reports_dir = os.path.join(get_work_dir(), 'Report')
+#         report_filename = f"{project_name}.txt"
+#         report_path = os.path.join(project_reports_dir, report_filename)
         
-        if not os.path.exists(report_path):
-            return jsonify({
-                "message": f"Report {project_name}.txt does not exist",
-                "status": "error"
-            }), 404
+#         if not os.path.exists(report_path):
+#             return jsonify({
+#                 "message": f"Report {project_name}.txt does not exist",
+#                 "status": "error"
+#             }), 404
         
-        # 解析报告
-        parser = ReportParser(report_path)
-        data = parser.filter_data(filters)
+#         # 解析报告
+#         parser = ReportParser(report_path)
+#         data = parser.filter_data(filters)
         
-        return jsonify({
-            "data": data,
-            "status": "success",
-            "report_name": report_filename
-        })
-    except Exception as e:
-        return jsonify({
-            "message": f"Failed to parse report: {str(e)}",
-            "status": "error"
-        }), 500
+#         return jsonify({
+#             "data": data,
+#             "status": "success",
+#             "report_name": report_filename
+#         })
+#     except Exception as e:
+#         return jsonify({
+#             "message": f"Failed to parse report: {str(e)}",
+#             "status": "error"
+#         }), 500
 

@@ -15,13 +15,15 @@ logger = get_logger('venv')
 venv_bp = Blueprint('venv', __name__)
 
 # 读取配置文件
-ENV_BASE_PATH = get_env_base_path()
-CONDA_PATH = get_conda_path()
+def get_config():
+    ENV_BASE_PATH = get_env_base_path()
+    CONDA_PATH = get_conda_path()
+    return ENV_BASE_PATH, CONDA_PATH
 
 # 获取已安装的依赖列表
-def get_packages(env_path):
+def get_packages(env_path, conda_path):
     try:
-        result = subprocess.run([CONDA_PATH, 'list', '-p', env_path, '--json'],
+        result = subprocess.run([conda_path, 'list', '-p', env_path, '--json'],
                                 capture_output=True,
                                 text=True)
         if result.returncode == 0:
@@ -36,7 +38,7 @@ def get_packages(env_path):
         return []
 
 # 获取python版本
-def get_python_version(env_path):
+def get_python_version(env_path, conda_path):
     python_exe = os.path.join(env_path, 'Scripts', 'python.exe') if os.name == 'nt' else os.path.join(env_path, 'bin', 'python')
     if os.path.exists(python_exe):
         result = subprocess.run([python_exe, '--version'],
@@ -72,6 +74,8 @@ def create_venv():
 
         condapack_file.save(temp_path)
         temp_file_paths['condapack'] = temp_path
+
+    ENV_BASE_PATH, CONDA_PATH = get_config()
 
     def generate_progress():
         try:
@@ -159,8 +163,8 @@ def create_venv():
                 result = subprocess.run([CONDA_PATH, 'init', 'bash'], capture_output=True, text=True)
                 
                 # 获取环境详情
-                dependencies = get_packages(env_path)
-                version = get_python_version(env_path)
+                dependencies = get_packages(env_path, CONDA_PATH)
+                version = get_python_version(env_path, CONDA_PATH)
 
                 yield f"data: {json.dumps({'status':'progress', 'step':'Finalizing', 'progress':90, 'type':env_type})}\n\n"
                 time.sleep(0.5)
@@ -189,6 +193,5 @@ def create_venv():
                 except Exception as e:
                     logger.error(f'Error removing temporary file {temp_path}: {str(e)}')
     return Response(generate_progress(), mimetype='text/event-stream')
-        
     
         

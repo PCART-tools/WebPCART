@@ -1,24 +1,33 @@
-from flask import Blueprint, jsonify, request, send_from_directory, send_file
+from flask import Blueprint, jsonify, request, send_from_directory, send_file, session
 import os
 import json
 import zipfile
 import shutil
 from io import BytesIO
-from ..common import get_logger, get_project_base_path, get_project_copy_path, get_instrument_path
+from ..common import get_logger, get_project_base_path, get_project_copy_path, get_instrument_base_path, get_user_id
 
 logger = get_logger('project')
 project_bp = Blueprint('project', __name__)
 
 # 读取配置
-PROJECTS_ROOT = get_project_base_path()
-PROJECTS_COPY_ROOT = get_project_copy_path()
-INSTRUMENT_PROJECTS_ROOT = get_instrument_path()
+def get_project_paths():
+    PROJECTS_ROOT = get_project_base_path()
+    PROJECTS_COPY_ROOT = get_project_copy_path()
+    INSTRUMENT_PROJECTS_ROOT = get_instrument_base_path()
+    return PROJECTS_ROOT, PROJECTS_COPY_ROOT, INSTRUMENT_PROJECTS_ROOT
 
-project = None
+@project_bp.route('/user/info', methods=['GET'])
+def get_user_info():
+    user_id = get_user_id()
+    return jsonify({
+        "user_id": user_id,
+        "status": "success"
+    })
 
 # 获取项目
 @project_bp.route('/project', methods=['GET'])
 def get_projects():
+    project = session.get('project')
     return jsonify({
         "project": project,
         "status": "success"
@@ -37,10 +46,11 @@ def set_project():
             "status": "error"
         }), 400
     
-    project = path
+    session['project'] = path
+    PROJECTS_ROOT, PROJECTS_COPY_ROOT, INSTRUMENT_PROJECTS_ROOT = get_project_paths()
     project_dir = os.path.join(PROJECTS_ROOT, path)
 
-    # 清空原项目
+    # 清空目录
     if os.path.exists(PROJECTS_ROOT):
         for item in os.listdir(PROJECTS_ROOT):
             item_path = os.path.join(PROJECTS_ROOT, item)
@@ -63,13 +73,15 @@ def set_project():
     return jsonify({
         "message": "Project added successfully",
         "status": "success",
-        "path": project
+        "path": path
     })
 
 # 分批上传文件
 @project_bp.route('/project/upload_batch', methods=['POST'])
 def upload_batch():
     try:
+        PROJECTS_ROOT, PROJECTS_COPY_ROOT, INSTRUMENT_PROJECTS_ROOT = get_project_paths()
+
         project_name = request.form.get('projectName')
         batch_index = int(request.form.get('batchIndex', 0))
         files = request.files.getlist('files')
@@ -115,6 +127,8 @@ def upload_batch():
 # 获取项目树
 @project_bp.route('/project/tree', methods=['POST'])
 def get_project_tree():
+    PROJECTS_ROOT, PROJECTS_COPY_ROOT, INSTRUMENT_PROJECTS_ROOT = get_project_paths()
+
     data = request.get_json()
     project_name = data.get('name')
     project_type = data.get('type')
@@ -170,6 +184,8 @@ def get_project_tree():
 @project_bp.route('/project/download', methods=['POST'])
 def download_file():
     try:
+        PROJECTS_ROOT, PROJECTS_COPY_ROOT, INSTRUMENT_PROJECTS_ROOT = get_project_paths()
+
         data = request.get_json()
         project_name = data.get('projectName')
         path = data.get('path')
@@ -225,6 +241,8 @@ def download_file():
 @project_bp.route('/project/load_file', methods=['POST'])
 def get_file_content():
     try:
+        PROJECTS_ROOT, PROJECTS_COPY_ROOT, INSTRUMENT_PROJECTS_ROOT = get_project_paths()
+
         data = request.get_json()
         project_name = data.get('projectName')
         file_path = data.get('filePath')
@@ -271,6 +289,8 @@ def get_file_content():
 @project_bp.route('/project/save_file', methods=['POST'])
 def save_file():
     try:
+        PROJECTS_ROOT, PROJECTS_COPY_ROOT, INSTRUMENT_PROJECTS_ROOT = get_project_paths()
+
         data = request.get_json()
         project_name = data.get('projectName')
         file_path = data.get('filePath')

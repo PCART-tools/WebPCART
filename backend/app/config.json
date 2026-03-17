@@ -4,5 +4,7 @@
   "fix_config_base_path": "../pcart/Configure",
   "project_base_path": "./data/projects",
   "project_copy_path": "./data/projects_copy",
+  "report_base_path": "./data/reports",
+  "project_instrument_path": "./data/projects_instrument",
   "fix_work_dir": "../pcart"
 }
