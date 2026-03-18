@@ -116,3 +116,4 @@ MANIFEST
 Miniconda3-latest-Linux-x86_64.sh
 backend/app/__pycache__/__init__.cpython-312.pyc
 webpcart-images.tar
+test.py

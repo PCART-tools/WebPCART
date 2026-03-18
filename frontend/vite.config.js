@@ -17,6 +17,8 @@ export default defineConfig({
     }
   },
   server:{
+    host: '0.0.0.0',
+    port: 5173,
     proxy:{
       '/project':{
         target:'http://localhost:5000',
@@ -42,5 +44,8 @@ export default defineConfig({
   },
   optimizeDeps:{
     include: ['monaco-editor']
+  },
+  define: {
+    global: 'globalThis',
   }
 })

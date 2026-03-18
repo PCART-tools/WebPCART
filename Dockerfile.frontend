@@ -4,6 +4,7 @@ RUN npm config set registry https://registry.npmmirror.com
 
 WORKDIR /app
 
+COPY frontend/package*.json ./
 COPY frontend/ ./
 
 RUN npm install && npm run build
