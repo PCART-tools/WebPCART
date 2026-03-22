@@ -120,6 +120,7 @@ export const createEnvironment = async() => {
 
         const response = await fetch('/venv/create', {
             method: 'POST',
+            credentials: 'include',
             body: formData
         })
 

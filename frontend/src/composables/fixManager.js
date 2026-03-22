@@ -50,6 +50,7 @@ export const runFixCommand = async() => {
     try{
         const response = await fetch('/fix/run_fix',{
             method:'POST',
+            credentials: 'include',
             'headers':{
                 'Content-Type': 'application/json'
             },

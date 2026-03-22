@@ -95,6 +95,7 @@ const downloadItem = async () => {   // 下载文件
 
         const response = await fetch(`/project/download`, {
             method: 'POST',
+            credentials: 'include',
             headers:{
                 'Content-Type':'application/json'
             },
@@ -149,6 +150,7 @@ const loadFileContent = async () => {    // 加载文件内容
         const fullPath = getCurrentPath();
         const response = await fetch('/project/load_file', {
             method: 'POST',
+            credentials: 'include',
             headers:{
                 'Content-Type':'application/json'
             },

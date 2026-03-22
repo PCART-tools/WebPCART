@@ -17,15 +17,7 @@ def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(name)
 
 def get_user_id():
-    if hasattr(g, 'user_id'):
-        return g.user_id
-    user_id = session.get('user_id')
-    if not user_id:
-        import uuid
-        user_id = str(uuid.uuid4())
-        session['user_id'] = user_id
-        g.user_id = user_id
-    return user_id
+    return session.get('user_id')
 
 
 def get_project_base_path():
@@ -160,6 +152,7 @@ def clean_directories():
         os.path.join(base_backend_path, config['project_base_path']), 
         os.path.join(base_backend_path, config['project_copy_path']),  
         os.path.join(base_backend_path, config['report_base_path']),  
+        os.path.join(base_backend_path, config['env_base_path']),
         os.path.join(base_backend_path, config['project_instrument_path']), 
         os.path.join(base_pcart_path, 'Configure'),  
         os.path.join(base_pcart_path, 'Copy'),       

@@ -27,16 +27,14 @@ def get_user_info():
 # 获取项目
 @project_bp.route('/project', methods=['GET'])
 def get_projects():
-    project = session.get('project')
     return jsonify({
-        "project": project,
+        "project": None,
         "status": "success"
     })
 
 # 添加新项目(获取该项目在后端存放的路径)
 @project_bp.route('/project', methods=['POST'])
 def set_project():
-    global project
     data = request.get_json()
     path = data.get('path')
 
@@ -46,7 +44,6 @@ def set_project():
             "status": "error"
         }), 400
     
-    session['project'] = path
     PROJECTS_ROOT, PROJECTS_COPY_ROOT, INSTRUMENT_PROJECTS_ROOT = get_project_paths()
     project_dir = os.path.join(PROJECTS_ROOT, path)
 
@@ -60,7 +57,7 @@ def set_project():
                 shutil.rmtree(item_path)
 
     if os.path.exists(PROJECTS_COPY_ROOT):
-        for item in os.listdir(PROJECTS_ROOT):
+        for item in os.listdir(PROJECTS_COPY_ROOT):
             item_path = os.path.join(PROJECTS_ROOT, item)
             if os.path.isfile(item_path):
                 os.remove(item_path)

@@ -23,6 +23,7 @@ export const getReport = async () => {
     const encodedProjectName = encodeURIComponent(project.value);
     const response = await fetch(`/report/${encodedProjectName}`, {
       method: 'GET',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json'
       }

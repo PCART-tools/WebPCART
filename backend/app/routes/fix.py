@@ -120,6 +120,10 @@ def run_fix():
                 logger.error(error_msg)
                 yield f"data: {json.dumps({'status': 'error', 'message': error_msg})}\n\n"
                 return
+
+            # 检查报告文件目录存在
+            report_dir = os.path.join(WORK_DIR, 'Report')
+            os.makedirs(report_dir, exist_ok=True)
                 
             # 检查PCART程序是否存在
             if not os.path.exists(pcart_path):

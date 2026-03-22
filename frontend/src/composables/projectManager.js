@@ -104,6 +104,7 @@ export const uploadFiles = async(projectName, files) => {
 
             const response = await fetch('/project/upload_batch', {
                 method: 'POST',
+                credentials: 'include',
                 body: formData
             });
 
@@ -140,6 +141,7 @@ export const saveFile = async(projectType = 'original') => {
 
         const response = await fetch('/project/save_file', {
             method: 'POST',
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json'
             },
@@ -170,6 +172,7 @@ export const setProject = async(path) => {
     try{
         const response = await fetch('/project', {
             method: 'POST',
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json'
             },
@@ -193,6 +196,7 @@ export const loadProjectTree = async(projectName, type = 'original') => {
     try{
         const response = await fetch('/project/tree', {
             method: 'POST',
+            credentials: 'include',
             headers:{
                 'Content-Type': 'application/json'
             },
@@ -222,7 +226,9 @@ export const loadProjectTree = async(projectName, type = 'original') => {
 // 加载当前项目
 export const loadCurrentProject = async() => {
     try{
-        const response = await fetch('/project');
+        const response = await fetch('/project', {
+            credentials: 'include',
+        });
         const result = await response.json();
         if(result.status === 'success' && result.project){
             project.value = result.project;
@@ -246,6 +252,7 @@ export const downloadProject = async(projectType = 'original') => {
 
         const response = await fetch(`/project/download`, {
             method: 'POST',
+            credentials: 'include',
             headers:{
                 'Content-Type':'application/json'
             },
