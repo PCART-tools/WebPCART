@@ -161,21 +161,17 @@ const loadFileContent = async () => {    // 加载文件内容
             })
         });
 
-        if(response.ok){
-            const result = await response.json();
-            if(result.status === 'success'){
-                currentFilePath.value = fullPath;
-                const originalContent = result.content;
-                if(window.editor){
-                    window.editor.setValue(result.content);
-                    isContentModified.value = false;
-                    window.editor.updateOptions({readOnly: false});
-                }
-            }else{
-                showNotification('Failed to load file' + result.message , 'error');
+        const result = await response.json();
+        if(result.status === 'success'){
+            currentFilePath.value = fullPath;
+            const originalContent = result.content;
+            if(window.editor){
+                window.editor.setValue(result.content);
+                isContentModified.value = false;
+                window.editor.updateOptions({readOnly: false});
             }
         }else{
-            showNotification('Failed to load file: ' + response.json(), 'error');
+            showNotification(result.message , 'error');
         }
     }catch(error){
         console.error('Failed to load file:', error);

@@ -52,26 +52,23 @@ def create_app():
         from flask import session, request
         import uuid
         
-        print(f"=== SESSION DEBUG ===")
-        print(f"Request URL: {request.url}")
-        print(f"Request cookies: {dict(request.cookies)}")
+        # print(f"=== SESSION DEBUG ===")
+        # print(f"Request URL: {request.url}")
+        # print(f"Request cookies: {dict(request.cookies)}")
         
         # 尝试手动解析 session
         try:
             session_data = dict(session)
-            print(f"Session data: {session_data}")
-            if 'user_id' in session_data:
-                print(f"Existing user_id: {session_data['user_id']}")
-            else:
+            # print(f"Session data: {session_data}")
+            if 'user_id' not in session_data:
                 new_id = str(uuid.uuid4())
                 session['user_id'] = new_id
-                print(f"New user_id generated: {new_id}")
         except Exception as e:
-            print(f"Session parsing error: {e}")
-            print(f"Clearing invalid session and generating new user_id")
+            # print(f"Session parsing error: {e}")
+            # print(f"Clearing invalid session and generating new user_id")
             session.clear()
             new_id = str(uuid.uuid4())
             session['user_id'] = new_id
-            print(f"New user_id after error: {new_id}")
+            # print(f"New user_id after error: {new_id}")
 
     return app

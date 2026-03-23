@@ -29,12 +29,13 @@ export const getReport = async () => {
       }
     });
 
-    if (response.ok) {
-      const result = await response.json();
+    const result = await response.json();
+    
+    if (result.status === 'success') {
       reportData.value = result.data;
       showNotification(`report loaded`, 'success');
     } else {
-      showNotification(`Failed to load report`, 'error');
+      showNotification(result.message, 'error');
     }
   } catch (error) {
     console.error(`Error fetching report:`, error);

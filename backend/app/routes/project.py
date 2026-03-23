@@ -143,7 +143,7 @@ def get_project_tree():
 
     if not os.path.exists(root_path):
         return jsonify({
-            "message": "Project does not exist", 
+            "message": "Project does not exist or has expired", 
             "status": "error"
         }), 400
 
@@ -204,7 +204,7 @@ def download_file():
 
         if not os.path.exists(target_path):
             return jsonify({
-                "message": "File does not exist",
+                "message": "File does not exist or has expired",
                 "status": "error"
             }), 400
         
@@ -260,7 +260,7 @@ def get_file_content():
 
         if not os.path.exists(target_path):
             return jsonify({
-                "message": "file does not exist",
+                "message": "file does not exist or has expired",
                 "status": "error"
             }), 404
         

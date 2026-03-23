@@ -82,7 +82,7 @@ def run_fix():
                     shutil.copytree(backup_path, project_path)
                     logger.info(f"Project restored from backup: {backup_path} -> {project_path}")
                 else:
-                    error_msg = f"Error: Backup project does not exist {backup_path}"
+                    error_msg = f"Error: Backup project does not exist or has expired"
                     logger.error(error_msg)
                     yield f"data: {json.dumps({'status': 'error', 'message': error_msg})}\n\n"
                     return
@@ -100,7 +100,7 @@ def run_fix():
                     shutil.copytree(project_path, backup_path)
                     logger.info(f"Project backed up from {project_path} to {backup_path}")
                 else:
-                    error_msg = f"Error: Original project path does not exist {project_path}"
+                    error_msg = f"Error: Original project path does not exist or has expired"
                     logger.error(error_msg)
                     yield f"data: {json.dumps({'status': 'error', 'message': error_msg})}\n\n"
                     return
@@ -116,7 +116,7 @@ def run_fix():
             
             # 检查配置文件是否存在
             if not os.path.exists(config_file_path):
-                error_msg = f"Error: Configuration file does not exist {config_file_path}"
+                error_msg = f"Error: Configuration file does not exist or or has expired"
                 logger.error(error_msg)
                 yield f"data: {json.dumps({'status': 'error', 'message': error_msg})}\n\n"
                 return
@@ -127,7 +127,7 @@ def run_fix():
                 
             # 检查PCART程序是否存在
             if not os.path.exists(pcart_path):
-                error_msg = f"Error: PCART main file does not exist {pcart_path}"
+                error_msg = f"Error: PCART main file does not exist"
                 logger.error(error_msg)
                 yield f"data: {json.dumps({'status': 'error', 'message': error_msg})}\n\n"
                 return
