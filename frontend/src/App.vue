@@ -281,7 +281,7 @@
     </div>
 
     <!-- 环境导入窗口 -->
-    <EnvironmentImportModal
+        <EnvironmentImportModal
         :show-import-modal="showImportModal"
         :selected-env-type="selectedEnvType"
         :import-env-method="importEnvMethod"
@@ -300,6 +300,8 @@
         @handle-requirement-select="handleRequirementSelect"
         @handle-condapack-select="handleCondapackSelect"
         @create-environment="createEnvironment"
+        @update:import-env-method="importEnvMethod = $event"
+        @update:python-version="pythonVersion = $event"
     />
 
     <!-- 虚拟环境详情窗口 -->

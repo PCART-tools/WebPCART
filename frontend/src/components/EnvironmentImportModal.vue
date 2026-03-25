@@ -33,7 +33,7 @@
           </div>
         </div>
 
-        <div v-else-if="importEnvMethod == 'condapack'" class="import-method-section">
+        <div v-else-if="importEnvMethod === 'condapack'" class="import-method-section">
           <div class="form-group">
             <label>Conda Pack File</label>
             <input type="file" accept=".tar,.tar.gz,.tgz" @change="handleCondapackSelect" class="file-input"/>
@@ -156,7 +156,12 @@ const createEnvironment = () => {
 };
 
 const updateImportEnvMethod = (event) => {
-  emit('update:importEnvMethod', event.target.value);
+  const newValue = event.target.value;
+  emit('update:importEnvMethod', newValue);
+  
+  if (newValue === 'condapack') {
+    emit('update:pythonVersion', '');
+  }
 };
 
 const updatePythonVersion = (event) => {

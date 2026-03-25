@@ -11,6 +11,9 @@ fix_bp = Blueprint('fix', __name__)
 
 WORK_DIR = get_work_dir()
 CONFIG_BASE_PATH = get_config_base_path()
+SANDBOX_PROFILE_PATH = os.path.join(os.path.dirname(__file__), '..', 'sandbox', 'pcart.profile')
+EXECUTION_TIMEOUT = 600
+
 # 读取配置文件
 def get_paths():
     ENV_BASE_PATH = get_env_base_path()
@@ -43,6 +46,108 @@ def generate_fix_config(projectName, selectedLibrary, fix_command, run_file_path
         json.dump(config_content, f, ensure_ascii=False, indent=2)
 
     return config_file_path
+
+# 检查firejail是否可用
+def check_firejail_available():
+    try:
+        result = subprocess.run(
+            ['firejail', '--version'],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            return True
+        else:
+            logger.warning("Firejail not found")
+            return False
+    except FileNotFoundError:
+        logger.warning("Firejail not installed")
+        return False
+    except Exception as e:
+        logger.error(f"Error checking Firejail: {str(e)}")
+        return False
+
+# 执行修复命令
+def run_fix_command(python_cmd, project_path, env_path): 
+    # 检查firejail
+    use_firejail = check_firejail_available()
+    timeout = 600
+    
+    if use_firejail:
+        logger.info("Running in Firejail sandbox")
+
+        firejail_cmd = [
+            'firejail',
+            f'--profile={SANDBOX_PROFILE_PATH}',
+            '--quiet',
+            '--noprofile',
+            f'--private={project_path}',          
+            f'--bind={env_path},/sandbox/env',   
+            '--timeout=600',                      
+            '--seccomp',                         
+            '--caps.drop=all',                  
+            '--nonewprivileges',                 
+        ]
+        cmd = firejail_cmd + python_cmd
+    else:
+        logger.warning("Running without Firejail (basic isolation)")
+        # 降级到基本隔离
+        safe_env = os.environ.copy()
+        safe_env['PATH'] = f"{os.path.join(env_path, 'bin')}:/usr/bin:/bin"
+        safe_env['PYTHONPATH'] = ''
+        safe_env['HOME'] = '/tmp'
+        
+        def preexec_fn():
+            os.setsid()
+            try:
+                import resource
+                resource.setrlimit(resource.RLIMIT_AS, (512*1024*1024, 512*1024*1024))
+                resource.setrlimit(resource.RLIMIT_NOFILE, (1024, 1024))
+            except:
+                pass
+        
+        safe_cmd = cmd
+        extra_kwargs = {
+            'env': safe_env,
+            'preexec_fn': preexec_fn
+        }
+    
+    try:
+        # 执行命令
+        if use_firejail:
+            result = subprocess.run(
+                cmd,
+                cwd=WORK_DIR,
+                capture_output=True,
+                text=True,
+                timeout=timeout
+            )
+        else:
+            result = subprocess.run(
+                cmd,
+                cwd=WORK_DIR,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                **extra_kwargs
+            )
+        
+        logger.info(f"Execution completed, return code: {result.returncode}")
+        logger.info(f"STDOUT: {result.stdout[:500] if result.stdout else ''}")
+        if result.stderr:
+            logger.error(f"STDERR: {result.stderr[:500]}")
+        
+        return result
+        
+    except subprocess.TimeoutExpired:
+        logger.error("Execution timeout")
+        if use_firejail:
+            subprocess.run(['firejail', '--shutdown'], capture_output=True)
+        raise
+    except Exception as e:
+        logger.error(f"Execution error: {str(e)}")
+        raise
 
 @fix_bp.route('/fix/run_fix', methods=['POST'])
 def run_fix():
@@ -133,20 +238,26 @@ def run_fix():
                 return
             
             # 执行修复程序
-            result = subprocess.run(
-                cmd,
-                cwd=WORK_DIR,
-                capture_output=True,
-                text=True,
-                timeout=600
-            )
+            result = run_fix_command(cmd, project_path, ENV_BASE_PATH)
             
             logger.info(f"Repair completed, return code: {result.returncode}")
             logger.info(f"STDOUT: {result.stdout}")
-            if result.stderr:
-                logger.error(f"STDERR: {result.stderr}")
             
-            if result.returncode == 0:
+            repair_success = True
+            error_detail = ""
+            
+            # 判断修复是否成功
+            if result.returncode != 0:
+                repair_success = False
+                error_detail = result.stderr if result.stderr else f"Return code: {result.returncode}"
+            elif result.stdout and ('Traceback' in result.stdout or 'Error' in result.stdout):
+                repair_success = False
+                error_detail = result.stdout
+            elif result.stderr and result.stderr.strip():
+                repair_success = False
+                error_detail = result.stderr
+            
+            if repair_success:
                 logger.info(f"PCART repair successful")
                 
                 yield f"data: {json.dumps({'status': 'progress', 'step': 'Post-processing results', 'progress': 80})}\n\n"
@@ -187,7 +298,7 @@ def run_fix():
                 
                 yield f"data: {json.dumps({'status': 'success', 'message': 'Fix completed successfully', 'progress': 100})}\n\n"
             else:
-                error_msg = f"PCART repair failed, return code: {result.returncode}"
+                error_msg = f"PCART repair failed: {error_detail}"  
                 logger.error(error_msg)
                 yield f"data: {json.dumps({'status': 'error', 'message': error_msg})}\n\n"
         except subprocess.TimeoutExpired:

@@ -82,6 +82,15 @@ def create_venv():
             yield f"data: {json.dumps({'status':'progress', 'step':'Initializing', 'progress':5, 'type':env_type})}\n\n"
             time.sleep(0.5)
 
+            subprocess.run([CONDA_PATH, 'config', '--set', 'anaconda_upload', 'no'], 
+                          capture_output=True, text=True)
+            
+            result_tos_main = subprocess.run([CONDA_PATH, 'tos', 'accept', '--override-channels', '--channel', 'https://repo.anaconda.com/pkgs/main'], 
+                                             capture_output=True, text=True)
+            
+            result_tos_r = subprocess.run([CONDA_PATH, 'tos', 'accept', '--override-channels', '--channel', 'https://repo.anaconda.com/pkgs/r'], 
+                                          capture_output=True, text=True)
+
             # 创建虚拟环境目录
             env_path = os.path.join(ENV_BASE_PATH, f"{env_type}")
             if os.path.exists(env_path):
@@ -112,7 +121,7 @@ def create_venv():
                     temp_req.write(requirements_content)
                     req_path = temp_req.name
                 
-                result = subprocess.run([CONDA_PATH, 'install', '-p', env_path, '--file', req_path, '-y'],
+                result = subprocess.run([CONDA_PATH, 'install', '-p', env_path, '--file', req_path, '-y', '-c', 'conda-forge', '-c', 'defaults'],
                                         capture_output=True, text=True)
                 
                 if result.returncode != 0:
@@ -128,7 +137,7 @@ def create_venv():
 
                 yield f"data: {json.dumps({'status':'progress', 'step':'Finalizing', 'progress':95, 'type':env_type})}\n\n"
                 
-                dependencies = get_packages(env_path)
+                dependencies = get_packages(env_path, CONDA_PATH)
                 
                 result_data = {
                     'status': 'success',
