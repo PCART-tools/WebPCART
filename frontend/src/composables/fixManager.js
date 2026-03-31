@@ -86,6 +86,7 @@ export const runFixCommand = async() => {
                             fixProgressStep.value = data.message;
 
                             await setInstrumentProject(project.value)
+                            await loadProjectTree(project.value)
 
                             setTimeout(() => {
                                 showNotification('Fix completed successfully', 'success');

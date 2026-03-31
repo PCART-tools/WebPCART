@@ -28,7 +28,8 @@
 .detail-view-container {
   height: 100%;
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 10px;
 }
 
@@ -44,7 +45,6 @@
 .report-content {
   padding: 20px;
   height: 100%;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 20px;

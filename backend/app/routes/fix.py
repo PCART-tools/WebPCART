@@ -71,7 +71,8 @@ def check_firejail_available():
 # 执行修复命令
 def run_fix_command(python_cmd, project_path, env_path): 
     # 检查firejail
-    use_firejail = check_firejail_available()
+    in_docker = os.path.exists('/.dockerenv')
+    use_firejail = not in_docker and check_firejail_available()
     timeout = 600
     
     if use_firejail:
@@ -91,48 +92,17 @@ def run_fix_command(python_cmd, project_path, env_path):
         ]
         cmd = firejail_cmd + python_cmd
     else:
-        logger.warning("Running without Firejail (basic isolation)")
-        # 降级到基本隔离
-        safe_env = os.environ.copy()
-        safe_env['PATH'] = f"{os.path.join(env_path, 'bin')}:/usr/bin:/bin"
-        safe_env['PYTHONPATH'] = ''
-        safe_env['HOME'] = '/tmp'
-        
-        def preexec_fn():
-            os.setsid()
-            try:
-                import resource
-                resource.setrlimit(resource.RLIMIT_AS, (512*1024*1024, 512*1024*1024))
-                resource.setrlimit(resource.RLIMIT_NOFILE, (1024, 1024))
-            except:
-                pass
-        
-        safe_cmd = cmd
-        extra_kwargs = {
-            'env': safe_env,
-            'preexec_fn': preexec_fn
-        }
-    
+        cmd = python_cmd
+   
     try:
-        # 执行命令
-        if use_firejail:
-            result = subprocess.run(
-                cmd,
-                cwd=WORK_DIR,
-                capture_output=True,
-                text=True,
-                timeout=timeout
-            )
-        else:
-            result = subprocess.run(
-                cmd,
-                cwd=WORK_DIR,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-                **extra_kwargs
-            )
-        
+        result = subprocess.run(
+            cmd,
+            cwd=WORK_DIR,
+            capture_output=True,
+            text=True,
+            timeout=timeout
+        )
+   
         logger.info(f"Execution completed, return code: {result.returncode}")
         logger.info(f"STDOUT: {result.stdout[:500] if result.stdout else ''}")
         if result.stderr:
@@ -250,7 +220,7 @@ def run_fix():
             if result.returncode != 0:
                 repair_success = False
                 error_detail = result.stderr if result.stderr else f"Return code: {result.returncode}"
-            elif result.stdout and ('Traceback' in result.stdout or 'Error' in result.stdout):
+            elif result.stdout and ('Traceback' in result.stdout or 'Error' in result.stdout or 'Failure' in result.stdout):
                 repair_success = False
                 error_detail = result.stdout
             elif result.stderr and result.stderr.strip():

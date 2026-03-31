@@ -5,8 +5,110 @@
     <link rel="icon" href="/favicon.ico">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebPCART</title>
+    <style>
+      #mobile-block-screen {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        z-index: 99999;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        text-align: center;
+        padding: 20px;
+        box-sizing: border-box;
+      }
+
+      #mobile-block-screen.show {
+        display: flex;
+      }
+
+      #mobile-block-screen .icon {
+        font-size: 80px;
+        color: white;
+        margin-bottom: 30px;
+      }
+
+      #mobile-block-screen h1 {
+        color: white;
+        font-size: 28px;
+        margin-bottom: 20px;
+        font-weight: 600;
+      }
+
+      #mobile-block-screen p {
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 16px;
+        line-height: 1.6;
+        max-width: 500px;
+      }
+
+      #mobile-block-screen .device-hint {
+        margin-top: 30px;
+        padding: 15px 25px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        backdrop-filter: blur(10px);
+      }
+
+      #mobile-block-screen .device-hint p {
+        margin: 5px 0;
+        font-size: 14px;
+      }
+    </style>
+    <script>
+      (function() {
+        function isMobileDevice() {
+          const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+          
+          const mobilePatterns = [
+            /Android/i,
+            /webOS/i,
+            /iPhone/i,
+            /iPad/i,
+            /iPod/i,
+            /BlackBerry/i,
+            /Windows Phone/i,
+            /Opera Mini/i,
+            /IEMobile/i,
+            /Mobile/i,
+            /Mobi/i
+          ];
+
+          const isMobile = mobilePatterns.some(pattern => pattern.test(userAgent));
+          
+          const screenWidth = window.screen.width;
+          const isSmallScreen = screenWidth < 768;
+
+          return isMobile || isSmallScreen;
+        }
+
+        if (isMobileDevice()) {
+          document.addEventListener('DOMContentLoaded', function() {
+            const mobileBlock = document.getElementById('mobile-block-screen');
+            if (mobileBlock) {
+              mobileBlock.classList.add('show');
+              document.body.style.overflow = 'hidden';
+            }
+          });
+
+          window.isMobileDevice = true;
+        } else {
+          window.isMobileDevice = false;
+        }
+      })();
+    </script>
   </head>
   <body>
+    <div id="mobile-block-screen">
+      <div class="icon">📱</div>
+      <h1>暂不支持移动设备访问</h1>
+      <p>当前页面暂不支持移动设备访问<br>请使用桌面浏览器访问以获得最佳体验</p>
+    </div>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
   </body>

@@ -30,11 +30,11 @@ deny_sys_module
 deny_sys_rawio  
 
 # 资源限制
-rlimit-nofile 1024
+rlimit-nofile 4096
 rlimit-cpu 600
-rlimit-as 524288
+rlimit-as 2097152
 rlimit-core 0
-rlimit-nproc 256
+rlimit-nproc 16384
 
 # 权限限制
 no-new-privileges
@@ -50,3 +50,7 @@ env PYTHONUNBUFFERED=1
 env PYTHONDONTWRITEBYTECODE=1
 env HOME=/tmp
 env PATH=/usr/bin:/bin
+env OPENBLAS_NUM_THREADS=1
+env OMP_NUM_THREADS=1
+env MPLBACKEND=Agg
+env LD_PRELOAD=
