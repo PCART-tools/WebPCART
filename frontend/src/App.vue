@@ -20,7 +20,7 @@
         <div class="app-main">
             <!-- 项目管理栏（含运行结果） -->
             <div class="app-project">
-                <div class="project-nav">
+                <!-- <div class="project-nav">
                     <button
                         class="nav-button"
                         :class="{active: projectView === 'project'}"
@@ -31,9 +31,9 @@
                         :class="{active: projectView === 'detail'}"
                         @click="projectView = 'detail'"
                     >Details</button>
-                </div>
+                </div> -->
 
-                <div v-show="projectView === 'project'" class="project-content">
+                <div class="project-content">
                     <div class="project-title">
                         <b>Projects</b>
                         <button @click="selectFolder" title="import" class="import-button">
@@ -76,7 +76,7 @@
                     </div> 
                 </div>
 
-                <div v-show="projectView === 'detail'" class="detail-content">
+                <!-- <div v-show="projectView === 'detail'" class="detail-content">
                     <div v-if="fixCompleted" class="detail-buttons">
                         <button @click="getReport" class="detail-button">Report</button>
                     </div>
@@ -84,18 +84,18 @@
                     <div v-else>
                         <b>Run fix command to get results</b>
                     </div>       
-                </div>               
+                </div>                -->
             </div>
 
             <div class="app-code">
                 <!-- 代码编辑栏 -->
-                <div v-show="projectView === 'project' && currentFilePath" class="editor-container" ref="editorRef" :class="{disabled: !currentFilePath}"></div>
-                <div v-show="projectView === 'project' && !currentFilePath" class="editor-placeholder">
+                <div v-show="!fixCompleted || (fixCompleted && currentFilePath)" class="editor-container" ref="editorRef" :class="{disabled: !currentFilePath}"></div>
+                <div v-show="!fixCompleted && !currentFilePath" class="editor-placeholder">
                     <b>choose a file(.py / .txt) to edit</b>
                 </div>
 
                 <!-- 结果展示栏 -->
-                <div v-show="projectView === 'detail'" class="detail-view-container">
+                <div v-show="fixCompleted && !currentFilePath" class="detail-view-container">
                     <div v-if="reportData" class="report-content">
                         <div class="report-header">
                             <h3>Compatibility Report</h3>
@@ -278,6 +278,10 @@
                     </div>
                     <div class="progress-percentage">{{ fixProgress }}%</div>
                 </div>
+
+                <button v-if="fixCompleted" class="run-button" @click="showReport">
+                    Report
+                </button>
             </div>
         </div>
     </div>
@@ -420,12 +424,17 @@ import EnvironmentDetailsModal from './components/EnvironmentDetailsModal.vue';
 import { showNotification } from './composables/utils';
 
 // 项目视图状态
-const projectView = ref('project')
+// const projectView = ref('project')
 
 // 编辑器相关
 const editorRef = ref(null)
 let editor = null
 let handleKeyDown = null
+
+const showReport = () => {
+    currentFilePath.value = null;
+    getReport();
+}
 
 const handleSelectedLibrary = computed({
     get(){
