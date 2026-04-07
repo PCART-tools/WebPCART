@@ -5,6 +5,7 @@ import shutil
 from flask import g, session, request
 import threading
 import time
+import subprocess
 
 # 设置日志配置
 logging.basicConfig(level=logging.INFO)
@@ -159,9 +160,9 @@ def clean_directories():
                         shutil.rmtree(item_path)  
                 except Exception as e:
                     logger.error(f"Error deleting {item_path}: {e}")
-            logger.info(f"Completed cleaning directory: {directory}")
-        else:
-            logger.warning(f"Directory does not exist, skipping cleanup: {directory}")
+            # logger.info(f"Completed cleaning directory: {directory}")
+        # else:
+        #     logger.warning(f"Directory does not exist, skipping cleanup: {directory}")
 
 # 清理对应目录的过期文件
 def clean_old_files(directory, expiry_hours):
@@ -237,3 +238,19 @@ def start_periodic_cleanup():
     cleanup_thread = threading.Thread(target=periodic_cleanup, daemon=True)
     cleanup_thread.start()
     logger.info("Started periodic cleanup thread")
+
+# 初始化conda配置
+def initialize_conda_config():
+    try:
+        CONDA_PATH = get_conda_path()
+
+        subprocess.run([CONDA_PATH, 'config', '--set', 'anaconda_upload', 'no'], 
+                      capture_output=True, text=True)
+        subprocess.run([CONDA_PATH, 'tos', 'accept', '--override-channels', '--channel', 'https://repo.anaconda.com/pkgs/main'], 
+                       capture_output=True, text=True)
+        subprocess.run([CONDA_PATH, 'tos', 'accept', '--override-channels', '--channel', 'https://repo.anaconda.com/pkgs/r'], 
+                       capture_output=True, text=True)
+        
+        logging.info("Conda configuration initialized successfully")
+    except Exception as e:
+        logging.error(f"Failed to initialize conda configuration: {str(e)}")

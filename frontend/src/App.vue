@@ -205,13 +205,13 @@
                         <b>Import Virtual Environment</b>
                         <div class="env-section">
                             <button class="env-display-button" :class="{'env-ready': currentEnv.path}" @click="openEnvDetailsModal('current')">
-                                <b>currentEnv</b>
+                                <b>Current Env</b>
                             </button>
                             <button class="env-add-button" @click="openImportEnvModal('current')">import</button>
                         </div>
                         <div class="env-section">
                             <button class="env-display-button" :class="{'env-ready': targetEnv.path}" @click="openEnvDetailsModal('target')">
-                                <b>targetEnv</b>
+                                <b>Target Env</b>
                             </button>
                             <button class="env-add-button" @click="openImportEnvModal('target')">import</button>
                         </div>
@@ -219,7 +219,7 @@
 
                 <!-- 修复库配置栏 -->
                 <div class="app-target">
-                    <b>Libraries to Fix</b>
+                    <b>Library to Fix</b>
                     <select class="target-select"
                             @change="handleLibrarySelect"
                             v-model="handleSelectedLibrary"

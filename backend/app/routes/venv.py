@@ -82,15 +82,6 @@ def create_venv():
             yield f"data: {json.dumps({'status':'progress', 'step':'Initializing', 'progress':5, 'type':env_type})}\n\n"
             time.sleep(0.5)
 
-            subprocess.run([CONDA_PATH, 'config', '--set', 'anaconda_upload', 'no'], 
-                          capture_output=True, text=True)
-            
-            result_tos_main = subprocess.run([CONDA_PATH, 'tos', 'accept', '--override-channels', '--channel', 'https://repo.anaconda.com/pkgs/main'], 
-                                             capture_output=True, text=True)
-            
-            result_tos_r = subprocess.run([CONDA_PATH, 'tos', 'accept', '--override-channels', '--channel', 'https://repo.anaconda.com/pkgs/r'], 
-                                          capture_output=True, text=True)
-
             # 创建虚拟环境目录
             env_path = os.path.join(ENV_BASE_PATH, f"{env_type}")
             if os.path.exists(env_path):
@@ -159,7 +150,7 @@ def create_venv():
 
                 # 解压到目标位置
                 os.makedirs(env_path, exist_ok=True)
-                yield f"data: {json.dumps({'status':'progress', 'step':'Extracting conda pack', 'progress':20, 'type':env_type})}\n\n"
+                yield f"data: {json.dumps({'status':'progress', 'step':'Extracting conda pack', 'progress':40, 'type':env_type})}\n\n"
                 result = subprocess.run(['tar', '-xzf', pack_path, '-C', env_path], 
                                         capture_output=True, text=True)
                 
@@ -167,9 +158,9 @@ def create_venv():
                     yield f"data: {json.dumps({'status':'error', 'message': f'Failed to extract conda pack: {result.stderr}', 'type':env_type})}\n\n"
                     return   
 
-                # 初始化虚拟环境
-                yield f"data: {json.dumps({'status':'progress', 'step':'Reinitializing conda environment', 'progress':60, 'type':env_type})}\n\n"
-                result = subprocess.run([CONDA_PATH, 'init', 'bash'], capture_output=True, text=True)
+                # # 初始化虚拟环境
+                # yield f"data: {json.dumps({'status':'progress', 'step':'Reinitializing conda environment', 'progress':60, 'type':env_type})}\n\n"
+                # result = subprocess.run([CONDA_PATH, 'init', 'bash'], capture_output=True, text=True)
                 
                 # 获取环境详情
                 dependencies = get_packages(env_path, CONDA_PATH)
