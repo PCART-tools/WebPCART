@@ -10,7 +10,7 @@ const selectedLibrary = ref(null)
 const isRunningFix = ref(false)
 const fixProgressStep = ref('Initializing')
 const fixProgress = ref(0)
-const fixError = ref('')
+const fixLog = ref('')
 
 // 获取选中的库信息
 export const getSelectedLibraryInfo = () =>{
@@ -43,7 +43,7 @@ export const runFixCommand = async() => {
     }
 
     isRunningFix.value = true;
-    fixError.value = '';
+    fixLog.value = '';
     fixProgress.value = 0;
     fixProgressStep.value = 'Starting fix process';
 
@@ -76,14 +76,16 @@ export const runFixCommand = async() => {
                         if (data.status === 'progress') {
                             fixProgressStep.value = data.step;
                             fixProgress.value = data.progress;
+                            fixLog.value += `${data.step}\n`
                         } else if (data.status === 'error') {
-                            fixError.value = data.message.replace(/\u001b\[[0-9;]*m/g, '');  // 去除ANSI控制字符
+                            const errorMessage = data.message.replace(/\u001b\[[0-9;]*m/g, '');  // 去除ANSI控制字符
+                            fixLog.value += `ERROR: ${errorMessage}\n`;
                             isRunningFix.value = false;
-                            showNotification(`Fix failed: ${data.message}`, 'error');
                             return;
                         } else if (data.status === 'success') {
                             fixProgress.value = 100;
                             fixProgressStep.value = data.message;
+                            fixLog.value += `${data.message}\n`;
 
                             await setInstrumentProject(project.value)
                             await loadProjectTree(project.value)
@@ -96,6 +98,15 @@ export const runFixCommand = async() => {
                             fixCompleted.value = true;
                             isRunningFix.value = false;
                             return;
+                        }else if (data.status === 'log') {
+                            if (data.content) {
+                                const logLines = data.content.split('\n');
+                                logLines.forEach(logLine => {
+                                    if (logLine.trim()) {
+                                        fixLog.value += logLine + '\n';
+                                    }
+                                });
+                            }
                         }
                     } catch (e) {
                         console.error('Error parsing fix progress JSON:', e);
@@ -104,7 +115,7 @@ export const runFixCommand = async() => {
             }
         }
     }catch(error){
-        fixError.value = error.message;
+        fixLog.value += `[${fixLog.value.split('\n').length - 1}] ERROR: ${error.message}\n`;
         isRunningFix.value = false;
         console.error('Failed to run fix with progress', error);
         showNotification('Failed to run fix:' + error.message, 'error');
@@ -117,7 +128,7 @@ export const resetFixState = () => {
     isRunningFix.value = false
     fixProgressStep.value = 'Initializing'
     fixProgress.value = 0
-    fixError.value = ''
+    fixLog.value = ''
 }
 
 export {
@@ -125,5 +136,5 @@ export {
     isRunningFix,
     fixProgressStep,
     fixProgress,
-    fixError
+    fixLog
 }

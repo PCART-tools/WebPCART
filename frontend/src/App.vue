@@ -195,6 +195,12 @@
                         <b>Select a command to view details</b>
                     </div>
                 </div>
+
+                <div v-show="fixLog" class="fix-log-container">
+                    <div class="log-content" ref="logContentRef">
+                        <pre class="log-text">{{ fixLog }}</pre>
+                    </div>
+                </div>
             </div>
 
             <!-- 配置栏 -->
@@ -271,10 +277,6 @@
                          :style="{width: fixProgress + '%'}"></div>
                     </div>
                     <div class="progress-percentage">{{ fixProgress }}%</div>
-                </div>
-
-                <div v-if="fixError" class="error-message">
-                    {{ fixError }}
                 </div>
             </div>
         </div>
@@ -406,7 +408,7 @@ import {
     isRunningFix,
     fixProgressStep,
     fixProgress,
-    fixError,
+    fixLog,
     getSelectedLibraryInfo,
     runFixCommand
 } from './composables/fixManager'

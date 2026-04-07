@@ -195,3 +195,29 @@
     font-size: 14px;
     text-align: center;
 }
+
+.fix-log-container{
+    margin-top: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: #000;
+    color: #fff;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 12px;
+    overflow: hidden;
+    width: 100%;
+    height: 200px;
+    
+    .log-content {
+        padding: 12px;
+        height: 100%;
+        overflow-y: auto;
+        
+        .log-text {
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+            min-height: 100%;
+        }
+    } 
+}

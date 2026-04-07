@@ -102,19 +102,8 @@ def run_fix_command(python_cmd, project_path, env_path):
             text=True,
             timeout=timeout
         )
-   
-        logger.info(f"Execution completed, return code: {result.returncode}")
-        logger.info(f"STDOUT: {result.stdout[:500] if result.stdout else ''}")
-        if result.stderr:
-            logger.error(f"STDERR: {result.stderr[:500]}")
         
         return result
-        
-    except subprocess.TimeoutExpired:
-        logger.error("Execution timeout")
-        if use_firejail:
-            subprocess.run(['firejail', '--shutdown'], capture_output=True)
-        raise
     except Exception as e:
         logger.error(f"Execution error: {str(e)}")
         raise
@@ -141,6 +130,7 @@ def run_fix():
             yield f"data: {json.dumps({'status': 'progress', 'step': 'Building the configuration file', 'progress': 10})}\n\n"
 
             project_path = os.path.join(PROJECT_BASE_PATH, project_name)
+
             config_file_path = generate_fix_config(project_name, selected_library, run_command, run_file_path, project_path, ENV_BASE_PATH)
 
             if fix_completed:
@@ -179,6 +169,16 @@ def run_fix():
                     logger.error(error_msg)
                     yield f"data: {json.dumps({'status': 'error', 'message': error_msg})}\n\n"
                     return
+
+            # 检查运行文件是否存在
+            run_file = run_command.split()[1]
+            full_run_file_path = os.path.join(project_path, run_file_path, run_file)
+            logger.info(f"run_file_path: {full_run_file_path}")
+            if not os.path.exists(full_run_file_path):
+                error_msg = f"Error: Run file does not exist: {run_file}"
+                logger.error(error_msg)
+                yield f"data: {json.dumps({'status': 'error', 'message': error_msg})}\n\n"
+                return  
             
             yield f"data: {json.dumps({'status': 'progress', 'step': 'Running the repair program', 'progress': 45})}\n\n"
             
@@ -229,6 +229,8 @@ def run_fix():
             
             if repair_success:
                 logger.info(f"PCART repair successful")
+                if result.stdout:
+                    yield f"data: {json.dumps({'status': 'log', 'content': result.stdout})}\n\n"
                 
                 yield f"data: {json.dumps({'status': 'progress', 'step': 'Post-processing results', 'progress': 80})}\n\n"
                 
