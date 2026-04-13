@@ -8,11 +8,21 @@ import sys
 import logging
 import re
 import time
-from ..common import get_logger, get_env_base_path, get_conda_path
+import threading
+from ..common import get_logger, get_env_base_path, get_conda_path, get_user_id
 
 logger = get_logger('venv')
 
 venv_bp = Blueprint('venv', __name__)
+
+_user_locks = {}
+_locks_mutex = threading.Lock()
+
+def get_user_lock(user_id):
+    with _locks_mutex:
+        if user_id not in _user_locks:
+            _user_locks[user_id] = threading.Lock()
+        return _user_locks[user_id]
 
 # 读取配置文件
 def get_config():
@@ -61,6 +71,9 @@ def create_venv():
     importEnvMethod = request.form.get("importEnvMethod")
     python_version = request.form.get('pythonVersion', 'python3.9')
 
+    user_id = get_user_id()
+    user_lock = get_user_lock(user_id)
+
     temp_file_paths = {}
 
     if importEnvMethod == 'requirements':
@@ -96,12 +109,33 @@ def create_venv():
 
                 python_version_num = python_version.replace('python', '')   # 提取版本号
 
-                result = subprocess.run([CONDA_PATH, 'create', '-y', '-p', env_path, f'python={python_version_num}'],
-                                        capture_output=True, 
-                                        text=True)
-                if result.returncode != 0:
-                    yield f"data: {json.dumps({'status':'error', 'message': f'Failed to create environment: {result.stderr}'})}\n\n"
-                    return
+                temp_conda_dir = tempfile.mkdtemp(prefix=f'conda_isolated_{user_id}_')
+                temp_pkgs_dir = os.path.join(temp_conda_dir, 'pkgs')
+                temp_cache_dir = os.path.join(temp_conda_dir, 'cache')
+                os.makedirs(temp_pkgs_dir, exist_ok=True)
+                os.makedirs(temp_cache_dir, exist_ok=True)
+
+                try:
+                    env_vars = os.environ.copy()
+                    env_vars['CONDA_PKGS_DIRS'] = temp_pkgs_dir
+                    env_vars['CONDA_CHANNELS'] = 'conda-forge,defaults'
+                    
+                    with user_lock:
+                        result = subprocess.run(
+                            [CONDA_PATH, 'create', '-y', '-p', env_path, f'python={python_version_num}'],
+                            capture_output=True, 
+                            text=True,
+                            env=env_vars
+                        )
+                        if result.returncode != 0:
+                            yield f"data: {json.dumps({'status':'error', 'message': f'Failed to create environment: {result.stderr}'})}\n\n"
+                            return
+
+                finally:
+                    try:
+                        shutil.rmtree(temp_conda_dir, ignore_errors=True)
+                    except Exception as e:
+                        logger.warning(f"Failed to cleanup temp conda dir: {e}")
 
                 yield f"data: {json.dumps({'status':'progress', 'step':'Conda envrionment created', 'progress':25, 'type':env_type})}\n\n"
                 time.sleep(0.5)
@@ -112,13 +146,34 @@ def create_venv():
                     temp_req.write(requirements_content)
                     req_path = temp_req.name
                 
-                result = subprocess.run([CONDA_PATH, 'install', '-p', env_path, '--file', req_path, '-y', '-c', 'conda-forge', '-c', 'defaults'],
-                                        capture_output=True, text=True)
+                temp_conda_dir2 = tempfile.mkdtemp(prefix=f'conda_install_{user_id}_')
+                temp_pkgs_dir2 = os.path.join(temp_conda_dir2, 'pkgs')
+                temp_cache_dir2 = os.path.join(temp_conda_dir2, 'cache')
+                os.makedirs(temp_pkgs_dir2, exist_ok=True)
+                os.makedirs(temp_cache_dir2, exist_ok=True)
                 
-                if result.returncode != 0:
-                    os.unlink(req_path)
-                    yield f"data: {json.dumps({'status':'error', 'message': f'Failed to install dependencies: {result.stderr}', 'type':env_type})}\n\n"
-                    return
+                try:
+                    env_vars2 = os.environ.copy()
+                    env_vars2['CONDA_PKGS_DIRS'] = temp_pkgs_dir2
+                    
+                    with user_lock:
+                        result = subprocess.run(
+                            [CONDA_PATH, 'install', '-p', env_path, '--file', req_path, '-y', 
+                             '-c', 'conda-forge', '-c', 'defaults'],
+                            capture_output=True, 
+                            text=True,
+                            env=env_vars2
+                        )
+                        
+                        if result.returncode != 0:
+                            os.unlink(req_path)
+                            yield f"data: {json.dumps({'status':'error', 'message': f'Failed to install dependencies: {result.stderr}', 'type':env_type})}\n\n"
+                            return
+                finally:
+                    try:
+                        shutil.rmtree(temp_conda_dir2, ignore_errors=True)
+                    except Exception as e:
+                        logger.warning(f"Failed to cleanup temp conda dir: {e}")
 
                 os.unlink(req_path)
 

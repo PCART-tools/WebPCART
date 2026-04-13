@@ -11,8 +11,6 @@ fix_bp = Blueprint('fix', __name__)
 
 WORK_DIR = get_work_dir()
 CONFIG_BASE_PATH = get_config_base_path()
-SANDBOX_PROFILE_PATH = os.path.join(os.path.dirname(__file__), '..', 'sandbox', 'pcart.profile')
-EXECUTION_TIMEOUT = 600
 
 # 读取配置文件
 def get_paths():
@@ -47,56 +45,13 @@ def generate_fix_config(projectName, selectedLibrary, fix_command, run_file_path
 
     return config_file_path
 
-# 检查firejail是否可用
-def check_firejail_available():
-    try:
-        result = subprocess.run(
-            ['firejail', '--version'],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        if result.returncode == 0:
-            return True
-        else:
-            logger.warning("Firejail not found")
-            return False
-    except FileNotFoundError:
-        logger.warning("Firejail not installed")
-        return False
-    except Exception as e:
-        logger.error(f"Error checking Firejail: {str(e)}")
-        return False
-
 # 执行修复命令
 def run_fix_command(python_cmd, project_path, env_path): 
-    # 检查firejail
-    in_docker = os.path.exists('/.dockerenv')
-    use_firejail = not in_docker and check_firejail_available()
     timeout = 600
-    
-    if use_firejail:
-        logger.info("Running in Firejail sandbox")
-
-        firejail_cmd = [
-            'firejail',
-            f'--profile={SANDBOX_PROFILE_PATH}',
-            '--quiet',
-            '--noprofile',
-            f'--private={project_path}',          
-            f'--bind={env_path},/sandbox/env',   
-            '--timeout=600',                      
-            '--seccomp',                         
-            '--caps.drop=all',                  
-            '--nonewprivileges',                 
-        ]
-        cmd = firejail_cmd + python_cmd
-    else:
-        cmd = python_cmd
    
     try:
         result = subprocess.run(
-            cmd,
+            python_cmd,
             cwd=WORK_DIR,
             capture_output=True,
             text=True,
