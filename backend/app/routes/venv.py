@@ -8,29 +8,22 @@ import sys
 import logging
 import re
 import time
+from ..common import get_logger, get_env_base_path, get_conda_path
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger('venv')
 
 venv_bp = Blueprint('venv', __name__)
 
 # 读取配置文件
-config_path = os.path.join(os.path.dirname(__file__), '..', 'config.json')
-with open(config_path, 'r', encoding='utf-8') as f:
-    config = json.load(f)
-
-ENV_BASE_PATH = os.path.join(os.path.dirname(__file__), '..', '..', config['env_base_path'])
-
-print(ENV_BASE_PATH)
-if not os.path.exists(ENV_BASE_PATH):
-    os.makedirs(ENV_BASE_PATH)
-
-CONDA_PATH = config['conda_path']
+def get_config():
+    ENV_BASE_PATH = get_env_base_path()
+    CONDA_PATH = get_conda_path()
+    return ENV_BASE_PATH, CONDA_PATH
 
 # 获取已安装的依赖列表
-def get_packages(env_path):
+def get_packages(env_path, conda_path):
     try:
-        result = subprocess.run([CONDA_PATH, 'list', '-p', env_path, '--json'],
+        result = subprocess.run([conda_path, 'list', '-p', env_path, '--json'],
                                 capture_output=True,
                                 text=True)
         if result.returncode == 0:
@@ -45,7 +38,7 @@ def get_packages(env_path):
         return []
 
 # 获取python版本
-def get_python_version(env_path):
+def get_python_version(env_path, conda_path):
     python_exe = os.path.join(env_path, 'Scripts', 'python.exe') if os.name == 'nt' else os.path.join(env_path, 'bin', 'python')
     if os.path.exists(python_exe):
         result = subprocess.run([python_exe, '--version'],
@@ -68,12 +61,21 @@ def create_venv():
     importEnvMethod = request.form.get("importEnvMethod")
     python_version = request.form.get('pythonVersion', 'python3.9')
 
+    temp_file_paths = {}
+
     if importEnvMethod == 'requirements':
         requirements_file = request.files['requirements']
         requirements_content = requirements_file.read().decode('utf-8')
-    elif importEnvMethod == 'environment':
-        environment_file = request.files['environment']
-        environment_content = environment_file.read().decode('utf-8')
+    elif importEnvMethod == 'condapack':
+        condapack_file = request.files['condapack']
+
+        temp_fd, temp_path = tempfile.mkstemp(suffix='tar.gz')
+        os.close(temp_fd)
+
+        condapack_file.save(temp_path)
+        temp_file_paths['condapack'] = temp_path
+
+    ENV_BASE_PATH, CONDA_PATH = get_config()
 
     def generate_progress():
         try:
@@ -137,31 +139,32 @@ def create_venv():
                 }
 
                 yield f"data: {json.dumps(result_data)}\n\n"  
+            elif importEnvMethod == 'condapack':
+                # 保存上传的conda pack文件
+                yield f"data: {json.dumps({'status':'progress', 'step':'Saving conda pack file', 'progress':10, 'type':env_type})}\n\n"
 
-            elif importEnvMethod == 'environment':
-                with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.yml') as temp_env:
-                    temp_env.write(environment_content)
-                    env_path_temp = temp_env.name
-                
-                # 创建虚拟环境
-                yield f"data: {json.dumps({'status':'progress', 'step':'Creating conda environment from environment.yml', 'progress':15, 'type':env_type})}\n\n"
-                result = subprocess.run([CONDA_PATH, 'env', 'create',
-                                        '--file', env_path_temp,
-                                        '--prefix', env_path,
-                                        '-y'
-                                        ], capture_output=True, text=True)
-                
-                os.unlink(env_path_temp)
+                pack_path = temp_file_paths['condapack']
 
+                if os.path.exists(env_path):
+                    shutil.rmtree(env_path)
+
+                # 解压到目标位置
+                os.makedirs(env_path, exist_ok=True)
+                yield f"data: {json.dumps({'status':'progress', 'step':'Extracting conda pack', 'progress':20, 'type':env_type})}\n\n"
+                result = subprocess.run(['tar', '-xzf', pack_path, '-C', env_path], 
+                                        capture_output=True, text=True)
+                
                 if result.returncode != 0:
-                    yield f"data: {json.dumps({'status':'error', 'message':f'Failed to create environment from environment.yml: {result.stderr}', 'type':env_type})}\n\n"      
-                    return      
+                    yield f"data: {json.dumps({'status':'error', 'message': f'Failed to extract conda pack: {result.stderr}', 'type':env_type})}\n\n"
+                    return   
 
-                yield f"data: {json.dumps({'status':'progress', 'step':'Environment created', 'progress':60, 'type':env_type})}\n\n"
-                            
+                # 初始化虚拟环境
+                yield f"data: {json.dumps({'status':'progress', 'step':'Reinitializing conda environment', 'progress':60, 'type':env_type})}\n\n"
+                result = subprocess.run([CONDA_PATH, 'init', 'bash'], capture_output=True, text=True)
+                
                 # 获取环境详情
-                dependencies = get_packages(env_path)
-                version = get_python_version(env_path)
+                dependencies = get_packages(env_path, CONDA_PATH)
+                version = get_python_version(env_path, CONDA_PATH)
 
                 yield f"data: {json.dumps({'status':'progress', 'step':'Finalizing', 'progress':90, 'type':env_type})}\n\n"
                 time.sleep(0.5)
@@ -173,14 +176,22 @@ def create_venv():
                     'pythonVersion': version,
                     'type': env_type
                 }
-                yield f"data: {json.dumps(result_data)}\n\n" 
+                yield f"data: {json.dumps(result_data)}\n\n"                                              
             else:
                 yield f"data: {json.dumps({'status':'error', 'message': 'Unsupported importEnvMethod', 'type':env_type})}\n\n"
         except Exception as e:
             logger.error(f'Failed to create: {str(e)}')
 
             yield f"data: {json.dumps({'status':'error', 'message': f'Exception during environment creation: {str(e)}', 'type':env_type})}\n\n"
+        finally:
+            # 清理临时文件
+            for temp_path in temp_file_paths.values():
+                try:
+                    if os.path.exists(temp_path):
+                        os.unlink(temp_path)
+                        logger.info(f"Removed temporary file: {temp_path}")
+                except Exception as e:
+                    logger.error(f'Error removing temporary file {temp_path}: {str(e)}')
     return Response(generate_progress(), mimetype='text/event-stream')
-        
     
         

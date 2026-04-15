@@ -85,7 +85,7 @@
     font-size: 20px;
 }
 
-.current-project{
+.project{
     margin-top: 15px;
     display: flex;
     flex-direction: column;
@@ -100,6 +100,12 @@
     padding: 8px;
     background-color: #f0f0f0;
     border-radius: 5px;
+}
+
+.project-path{
+    white-space: nowrap;
+    overflow: hidden;
+    max-width: 100%;
 }
 
 .downloadProject{
@@ -149,6 +155,11 @@
     user-select: none;
 }
 
+.tree-node.selected {
+    background-color: #bde0ff;
+    font-weight: bold;
+}
+
 .tree-node:hover{
     background-color: #d2e0e7;
 }
@@ -177,4 +188,11 @@
 .download-button:hover{
     background-color: #e0e0e0;
     border-radius: 3px;
+}
+
+.divider-line {
+    height: 1px;
+    background-color: #ccc;
+    margin-top: 20px;
+    position: relative;
 }

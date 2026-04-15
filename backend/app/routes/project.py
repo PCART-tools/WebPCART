@@ -1,20 +1,33 @@
-from flask import Blueprint, jsonify, request, send_from_directory, send_file
+from flask import Blueprint, jsonify, request, send_from_directory, send_file, session
 import os
 import json
 import zipfile
+import shutil
 from io import BytesIO
+from ..common import get_logger, get_project_base_path, get_project_copy_path, get_instrument_base_path, get_user_id
 
+logger = get_logger('project')
 project_bp = Blueprint('project', __name__)
 
-PROJECTS_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'data', 'projects')
-project = None
+# 读取配置
+def get_project_paths():
+    PROJECTS_ROOT = get_project_base_path()
+    PROJECTS_COPY_ROOT = get_project_copy_path()
+    INSTRUMENT_PROJECTS_ROOT = get_instrument_base_path()
+    return PROJECTS_ROOT, PROJECTS_COPY_ROOT, INSTRUMENT_PROJECTS_ROOT
 
-if not os.path.exists(PROJECTS_ROOT):
-    os.makedirs(PROJECTS_ROOT)
+@project_bp.route('/user/info', methods=['GET'])
+def get_user_info():
+    user_id = get_user_id()
+    return jsonify({
+        "user_id": user_id,
+        "status": "success"
+    })
 
 # 获取项目
 @project_bp.route('/project', methods=['GET'])
 def get_projects():
+    project = session.get('project')
     return jsonify({
         "project": project,
         "status": "success"
@@ -33,17 +46,25 @@ def set_project():
             "status": "error"
         }), 400
     
-    project = path
+    session['project'] = path
+    PROJECTS_ROOT, PROJECTS_COPY_ROOT, INSTRUMENT_PROJECTS_ROOT = get_project_paths()
     project_dir = os.path.join(PROJECTS_ROOT, path)
 
-    # 清空原项目
+    # 清空目录
     if os.path.exists(PROJECTS_ROOT):
         for item in os.listdir(PROJECTS_ROOT):
             item_path = os.path.join(PROJECTS_ROOT, item)
             if os.path.isfile(item_path):
                 os.remove(item_path)
             elif os.path.isdir(item_path):
-                import shutil
+                shutil.rmtree(item_path)
+
+    if os.path.exists(PROJECTS_COPY_ROOT):
+        for item in os.listdir(PROJECTS_ROOT):
+            item_path = os.path.join(PROJECTS_ROOT, item)
+            if os.path.isfile(item_path):
+                os.remove(item_path)
+            elif os.path.isdir(item_path):
                 shutil.rmtree(item_path)
 
     if not os.path.exists(project_dir):
@@ -52,13 +73,15 @@ def set_project():
     return jsonify({
         "message": "Project added successfully",
         "status": "success",
-        "path": project
+        "path": path
     })
 
 # 分批上传文件
 @project_bp.route('/project/upload_batch', methods=['POST'])
 def upload_batch():
     try:
+        PROJECTS_ROOT, PROJECTS_COPY_ROOT, INSTRUMENT_PROJECTS_ROOT = get_project_paths()
+
         project_name = request.form.get('projectName')
         batch_index = int(request.form.get('batchIndex', 0))
         files = request.files.getlist('files')
@@ -104,8 +127,11 @@ def upload_batch():
 # 获取项目树
 @project_bp.route('/project/tree', methods=['POST'])
 def get_project_tree():
+    PROJECTS_ROOT, PROJECTS_COPY_ROOT, INSTRUMENT_PROJECTS_ROOT = get_project_paths()
+
     data = request.get_json()
     project_name = data.get('name')
+    project_type = data.get('type')
 
     if not project_name:
         return jsonify({
@@ -113,7 +139,10 @@ def get_project_tree():
             "status": "error"
         }), 400
     
-    root_path = os.path.join(PROJECTS_ROOT, project_name)
+    if project_type == 'original':
+        root_path = os.path.join(PROJECTS_ROOT, project_name)
+    elif project_type == 'instrument':
+        root_path = os.path.join(INSTRUMENT_PROJECTS_ROOT, project_name)
 
     if not os.path.exists(root_path):
         return jsonify({
@@ -133,7 +162,7 @@ def get_project_tree():
             children = []
 
             try:
-                for item in os.listdir(path):
+                for item in sorted(os.listdir(path)):
                     item_path = os.path.join(path, item)
                     child = build_tree(item_path)
                     if child:
@@ -155,10 +184,13 @@ def get_project_tree():
 @project_bp.route('/project/download', methods=['POST'])
 def download_file():
     try:
+        PROJECTS_ROOT, PROJECTS_COPY_ROOT, INSTRUMENT_PROJECTS_ROOT = get_project_paths()
+
         data = request.get_json()
         project_name = data.get('projectName')
         path = data.get('path')
         item_type = data.get('type')
+        project_type = data.get('projectType')
 
         if not project_name or not path:
             return jsonify({
@@ -166,7 +198,11 @@ def download_file():
                 "status": "error"
             }), 400
         
-        project_dir = os.path.join(PROJECTS_ROOT, project_name)
+        if project_type == 'instrument':
+            project_dir = os.path.join(INSTRUMENT_PROJECTS_ROOT, project_name)
+        else:
+            project_dir = os.path.join(PROJECTS_ROOT, project_name)
+        
         target_path = os.path.join(project_dir, path)
 
         if not os.path.exists(target_path):
@@ -205,9 +241,12 @@ def download_file():
 @project_bp.route('/project/load_file', methods=['POST'])
 def get_file_content():
     try:
+        PROJECTS_ROOT, PROJECTS_COPY_ROOT, INSTRUMENT_PROJECTS_ROOT = get_project_paths()
+
         data = request.get_json()
         project_name = data.get('projectName')
         file_path = data.get('filePath')
+        project_type = data.get('projectType')
         
         if not project_name or not file_path:
             return jsonify({
@@ -215,7 +254,11 @@ def get_file_content():
                 "status": "error"
             }), 400
         
-        project_dir = os.path.join(PROJECTS_ROOT, project_name)
+        if project_type == 'instrument':
+            project_dir = os.path.join(INSTRUMENT_PROJECTS_ROOT, project_name)
+        else:
+            project_dir = os.path.join(PROJECTS_ROOT, project_name)
+        
         target_path = os.path.join(project_dir, file_path)
 
         if not os.path.exists(target_path):
@@ -246,10 +289,13 @@ def get_file_content():
 @project_bp.route('/project/save_file', methods=['POST'])
 def save_file():
     try:
+        PROJECTS_ROOT, PROJECTS_COPY_ROOT, INSTRUMENT_PROJECTS_ROOT = get_project_paths()
+
         data = request.get_json()
         project_name = data.get('projectName')
         file_path = data.get('filePath')
         content = data.get('content')
+        project_type = data.get('projectType')
 
         if not project_name or not file_path:
             return jsonify({
@@ -257,7 +303,11 @@ def save_file():
                 "status": "error"
             }), 400
         
-        project_dir = os.path.join(PROJECTS_ROOT, project_name)
+        if project_type == 'instrument':
+            project_dir = os.path.join(INSTRUMENT_PROJECTS_ROOT, project_name)
+        else:
+            project_dir = os.path.join(PROJECTS_ROOT, project_name)
+            
         target_path = os.path.join(project_dir, file_path)
         target_dir = os.path.dirname(target_path)
         if not os.path.exists(target_dir):

@@ -1,6 +1,6 @@
 <template>
     <li>
-        <div class="tree-node" @click="handleNodeClick">
+        <div class="tree-node" :class="{'selected': isSelected}" @click="handleNodeClick">
             <i v-if="node.type === 'directory'"
                 @click.stop="toggleDirectory"
                 class="folder-toggle"
@@ -24,22 +24,29 @@
                 :node="child"
                 :project-name="projectName"
                 :base-path="getCurrentPath()"
+                :project-type="projectType"
             />
         </ul>
     </li>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, inject, computed } from 'vue'
 import { showNotification } from '../composables/utils'
-import { saveFile } from '../composables/projectManager'
+import { saveFile, currentFilePath, isContentModified, currentProjectType } from '../composables/projectManager'
+import { selectedFile, updateSelectedFile } from '../composables/projectManager'
 
-// 从projectManager导入状态
-import { currentFilePath, isContentModified } from '../composables/projectManager'
-
-const props = defineProps(['node', 'projectName', 'basePath'])
+const props = defineProps(['node', 'projectName', 'basePath', 'projectType'])
 
 const isExpanded = ref(false)
+
+// 判断当前节点是否被选中
+const isSelected = computed(() => {
+    return (
+        selectedFile.path === getCurrentPath() &&
+        selectedFile.projectType === props.projectType
+    );
+});
 
 const toggleDirectory = () => {  // 展开或折叠文件夹
     isExpanded.value = !isExpanded.value;
@@ -63,10 +70,12 @@ const handleNodeClick = () => {  // 处理文件点击
         if(isContentModified.value){
             const saveChanges = confirm('The current file has unsaved changes. Do you want to save them?');
             if(saveChanges){
-                saveFile();
+                saveFile(currentProjectType.value);
             }
         }
 
+        updateSelectedFile(getCurrentPath(), props.projectType);
+        currentProjectType.value = props.projectType;
         loadFileContent();
     }else if(props.node.type === 'directory'){
         toggleDirectory();
@@ -84,7 +93,7 @@ const downloadItem = async () => {   // 下载文件
     try{
         const fullPath = getCurrentPath();
 
-        const response = await fetch(`http://localhost:5000/project/download`, {
+        const response = await fetch(`/project/download`, {
             method: 'POST',
             headers:{
                 'Content-Type':'application/json'
@@ -92,7 +101,8 @@ const downloadItem = async () => {   // 下载文件
             body: JSON.stringify({
                 projectName: props.projectName,
                 path: fullPath,
-                type: props.node.type
+                type: props.node.type,
+                projectType: props.projectType
             })
         });
 
@@ -137,14 +147,15 @@ const buildPath = (node) => {    // 构建文件路径
 const loadFileContent = async () => {    // 加载文件内容
     try{
         const fullPath = getCurrentPath();
-        const response = await fetch('http://localhost:5000/project/load_file', {
+        const response = await fetch('/project/load_file', {
             method: 'POST',
             headers:{
                 'Content-Type':'application/json'
             },
             body: JSON.stringify({
                 projectName: props.projectName,
-                filePath: fullPath
+                filePath: fullPath,
+                projectType: props.projectType
             })
         });
 
@@ -159,7 +170,7 @@ const loadFileContent = async () => {    // 加载文件内容
                     window.editor.updateOptions({readOnly: false});
                 }
             }else{
-                showNotification('Failed to load file' + result.messagem , 'error');
+                showNotification('Failed to load file' + result.message , 'error');
             }
         }else{
             showNotification('Failed to load file: ' + response.json(), 'error');

@@ -1,9 +1,16 @@
-import { ref } from 'vue'
+import { ref, reactive } from 'vue'
 import { showNotification } from './utils'
+import { runCommand, configChanged } from './configManager'
 
 // 项目管理相关状态
 const project = ref(null)
 const fileTree = ref(null)
+
+const fixCompleted = ref(false)
+const instrumentProject = ref(null)
+const instrumentFileTree = ref(null)
+
+const currentProjectType = ref('original')
 const uploadProgress = ref(0)
 const isUploading = ref(false)
 const totalBatches = ref(0)
@@ -11,6 +18,17 @@ const currentBatch = ref(0)
 const currentFilePath = ref(null)
 const originalContent = ref('')
 const isContentModified = ref(false)
+
+// 选中文件状态
+export const selectedFile = reactive({
+    path: '',
+    projectType: ''
+})
+
+export function updateSelectedFile(path, projectType){
+    selectedFile.path = path;
+    selectedFile.projectType = projectType;
+}
 
 // 选择文件夹
 export const selectFolder = async() => {
@@ -34,6 +52,11 @@ export const selectFolder = async() => {
             // 获取文件夹名称
             const firstFile = files[0];
             let folderName = firstFile.webkitRelativePath.split('/')[0];
+            
+            runCommand.value = null;
+            fixCompleted.value = false;
+            configChanged.value = false;
+            clearinstrumentProject();
             await setProject(folderName);
             await uploadFiles(folderName, files);
         };
@@ -79,7 +102,7 @@ export const uploadFiles = async(projectName, files) => {
                 formData.append(`paths[${i}]`, relativePath);
             }
 
-            const response = await fetch('http://localhost:5000/project/upload_batch', {
+            const response = await fetch('/project/upload_batch', {
                 method: 'POST',
                 body: formData
             });
@@ -111,11 +134,11 @@ export const uploadFiles = async(projectName, files) => {
 }
 
 // 保存已修改文件
-export const saveFile = async() => {
+export const saveFile = async(projectType = 'original') => {
     try{
         const currentContent = window.editor.getValue();
 
-        const response = await fetch('http://localhost:5000/project/save_file', {
+        const response = await fetch('/project/save_file', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -123,7 +146,8 @@ export const saveFile = async() => {
             body: JSON.stringify({
                 projectName: project.value,
                 filePath: currentFilePath.value,
-                content: currentContent
+                content: currentContent,
+                projectType: projectType
             })
         });
 
@@ -144,7 +168,7 @@ export const saveFile = async() => {
 // 添加项目到后端
 export const setProject = async(path) => {
     try{
-        const response = await fetch('http://localhost:5000/project', {
+        const response = await fetch('/project', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -165,19 +189,24 @@ export const setProject = async(path) => {
 }
 
 // 加载项目树
-export const loadProjectTree = async(projectName) => {
+export const loadProjectTree = async(projectName, type = 'original') => {
     try{
-        const response = await fetch('http://localhost:5000/project/tree', {
+        const response = await fetch('/project/tree', {
             method: 'POST',
             headers:{
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({name: projectName})
+            body: JSON.stringify({name: projectName, type: type})
         });
 
         const result = await response.json();
         if(result.status === 'success'){
-            fileTree.value = result.tree;
+            if(type == 'original'){
+                fileTree.value = result.tree;
+            }else if(type == 'instrument'){
+                instrumentFileTree.value = result.tree;
+            }
+            
             if(!currentFilePath.value && window.editor){
                 window.editor.updateOptions({readOnly: true});
             }
@@ -193,7 +222,7 @@ export const loadProjectTree = async(projectName) => {
 // 加载当前项目
 export const loadCurrentProject = async() => {
     try{
-        const response = await fetch('http://localhost:5000/project');
+        const response = await fetch('/project');
         const result = await response.json();
         if(result.status === 'success' && result.project){
             project.value = result.project;
@@ -205,17 +234,17 @@ export const loadCurrentProject = async() => {
     }
 }
 
-export const downloadProject = async() => {
+export const downloadProject = async(projectType = 'original') => {
     try{
         // 检查是否有未保存的修改
         if(isContentModified.value && currentFilePath.value){
             const save = confirm('There are unsaved changes. Do you want to save them before downloading?');
             if(save){
-                await saveFile();
+                await saveFile(projectType);
             }
         }
 
-        const response = await fetch(`http://localhost:5000/project/download`, {
+        const response = await fetch(`/project/download`, {
             method: 'POST',
             headers:{
                 'Content-Type':'application/json'
@@ -223,7 +252,8 @@ export const downloadProject = async() => {
             body: JSON.stringify({
                 projectName: project.value,
                 path: '.',
-                type: 'project'
+                type: 'project',
+                projectType: projectType
             })
         });
 
@@ -248,15 +278,36 @@ export const downloadProject = async() => {
     }
 }
 
+// 设置修复后的项目
+export const setInstrumentProject = async(path) => {
+    try{
+        instrumentProject.value = path;
+        await loadProjectTree(path, 'instrument');
+    }catch(error){
+        console.error('Error setting instrument project:', error);
+        showNotification('Failed to set instrument project', 'error');
+    }
+}
+
+// 清空修复后的项目数据
+export const clearinstrumentProject = () => {
+    instrumentProject.value = null;
+    instrumentFileTree.value = null;
+}
+
 // 导出相关状态
 export {
     project,
     fileTree,
+    instrumentProject,
+    instrumentFileTree,
     uploadProgress,
     isUploading,
     totalBatches,
     currentBatch,
     currentFilePath,
     originalContent,
-    isContentModified
+    isContentModified,
+    currentProjectType,
+    fixCompleted
 }

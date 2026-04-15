@@ -3,7 +3,7 @@
         <!-- 功能栏 -->
         <div class="function-bar">
             <b>WebPCART</b>
-            <div class="function-buttons">
+            <!-- <div class="function-buttons">
                 <button @click="showInfo('setting')" title="setting">
                     <i class="fas fa-cog"></i>
                 </button>
@@ -13,7 +13,7 @@
                 <button @click="showInfo('about')" title="about">
                     <i class="fas fa-info-circle"></i>
                 </button>
-            </div>
+            </div> -->
         </div>
 
         <!-- 网页主体 -->
@@ -28,14 +28,9 @@
                     >Project</button>
                     <button
                         class="nav-button"
-                        :class="{active: projectView === 'intermediate'}"
-                        @click="projectView = 'intermediate'"
-                    >Intermediate</button>
-                    <button
-                        class="nav-button"
-                        :class="{active: projectView === 'fixresult'}"
-                        @click="projectView = 'fixresult'"
-                    >FixResult</button>
+                        :class="{active: projectView === 'detail'}"
+                        @click="projectView = 'detail'"
+                    >Details</button>
                 </div>
 
                 <div v-show="projectView === 'project'" class="project-content">
@@ -53,7 +48,8 @@
                         </div>
                         <div class="progress-percentage">{{ uploadProgress }} %</div>
                     </div>
-                    <div v-if="!isUploading && project" class="current-project">
+
+                    <div v-if="!isUploading && project" class="project">
                         <div class="project-header">
                             <span class="project-path">{{project}}</span>
                             <button class="downloadProject" title="Download Project" @click="downloadProject">
@@ -61,32 +57,143 @@
                             </button>
                         </div>
                         <div v-if="fileTree" class="file-tree">
-                            <tree-view :tree-data="fileTree" :project-name="project"/>
-                        </div>
+                            <tree-view :tree-data="fileTree" :project-name="project" project-type="original"/>
+                        </div> 
                     </div>  
+
+                    <div v-if="!isUploading && instrumentProject" class="divider-line"></div>
+
+                    <div v-if="!isUploading && instrumentProject" class="project">
+                        <div class="project-header">
+                            <span class="project-path">{{project}} -instrument</span>
+                            <button class="downloadProject" title="Download Project" @click="downloadProject('instrument')">
+                                <i class="fas fa-download"></i>
+                            </button>
+                        </div>
+                        <div v-if="instrumentFileTree" class="file-tree">
+                            <tree-view :tree-data="instrumentFileTree" :project-name="instrumentProject" project-type="instrument"/>
+                        </div> 
+                    </div> 
                 </div>
 
-                <div v-show="projectView === 'intermediate'" class="intermediate-content">
-                    <b>Run fix command to get results</b>
-                </div>
-
-                <div v-show="projectView === 'fixresult'" class="result-content">
-                    <b>Run fix command to get results</b>
-                </div>
-                
+                <div v-show="projectView === 'detail'" class="detail-content">
+                    <div v-if="fixCompleted" class="detail-buttons">
+                        <button @click="getReport" class="detail-button">Report</button>
+                    </div>
+                    
+                    <div v-else>
+                        <b>Run fix command to get results</b>
+                    </div>       
+                </div>               
             </div>
 
-            <div class="app-middle">
+            <div class="app-code">
                 <!-- 代码编辑栏 -->
-                <div class="app-code">
-                    <div class="editor-container" ref="editorRef" :class="{disabled: !currentFilePath}" v-show="currentFilePath"></div>
-                    <div v-if="!currentFilePath" class="editor-placeholder">
-                        <b>choose a file(.py / .txt) to edit</b>
-                    </div>
+                <div v-show="projectView === 'project' && currentFilePath" class="editor-container" ref="editorRef" :class="{disabled: !currentFilePath}"></div>
+                <div v-show="projectView === 'project' && !currentFilePath" class="editor-placeholder">
+                    <b>choose a file(.py / .txt) to edit</b>
                 </div>
-                
-                <div class="app-terminal">
-                    <b>Terminal</b>
+
+                <!-- 结果展示栏 -->
+                <div v-show="projectView === 'detail'" class="detail-view-container">
+                    <div v-if="reportData" class="report-content">
+                        <div class="report-header">
+                            <h3>Compatibility Report</h3>
+                        </div>
+                        
+                        <!-- 统计信息卡片 -->
+                        <div class="report-stats" v-if="reportData.stat_info">
+                            <div class="run-command-section">
+                                <h4>Run Command: <span class="command-text">{{ reportData.stat_info.run_command }}</span></h4>
+                            </div>
+                            
+                            <div class="stats-grid first-row">
+                                <div class="stat-card">
+                                    <h4>Total Files</h4>
+                                    <p class="stat-number">{{ reportData.stat_info.total_file_number || 0 }}</p>
+                                </div>
+                                <div class="stat-card">
+                                    <h4>Total APIs</h4>
+                                    <p class="stat-number">{{ reportData.stat_info.total_api_number || 0 }}</p>
+                                </div>
+                            </div>
+                            
+                            <div class="stats-grid second-row">
+                                <div class="stat-card">
+                                    <h4>Covered APIs</h4>
+                                    <p class="stat-number">{{ reportData.stat_info.covered_number || 0 }}</p>
+                                </div>
+                                <div class="stat-card">
+                                    <h4>Uncovered APIs</h4>
+                                    <p class="stat-number">{{ (reportData.stat_info.not_covered_number) || 0 }}</p>
+                                </div>
+                            </div>
+                            
+                            <div class="stats-grid third-row">
+                                <div class="stat-card">
+                                    <h4>Compatible APIs</h4>
+                                    <p class="stat-number">{{ reportData.stat_info.compatible_number || 0 }}</p>
+                                </div>
+                                <div class="stat-card">
+                                    <h4>Unknown Compatible APIs</h4>
+                                    <p class="stat-number">{{ reportData.stat_info.unknown_compatible_number || 0 }}</p>
+                                </div>
+                                <div class="stat-card">
+                                    <h4>Incompatible APIs</h4>
+                                    <p class="stat-number">{{ reportData.stat_info.incompatible_number || 0 }}</p>
+                                </div>
+                            </div>
+                            
+                            <div class="stats-grid fourth-row">
+                                <div class="stat-card">
+                                    <h4>Successfully Repaired</h4>
+                                    <p class="stat-number">{{ reportData.stat_info.successfully_repaired_number || 0 }}</p>
+                                </div>
+                                <div class="stat-card">
+                                    <h4>Failed to Repair</h4>
+                                    <p class="stat-number">{{ reportData.stat_info.failed_repair_number || 0 }}</p>
+                                </div>
+                                <div class="stat-card">
+                                    <h4>Unknown Repair Status</h4>
+                                    <p class="stat-number">{{ reportData.stat_info.unknown_repair_status_number || 0 }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- API详细信息 -->
+                        <div class="api-details" v-if="reportData.api_details && reportData.api_details.length > 0">
+                            <h4>Detailed API Analysis</h4>
+                            <div class="api-table-container">
+                                <table class="api-table">
+                                    <thead>
+                                        <tr>
+                                            <th>API Call</th>
+                                            <th>Location</th>
+                                            <th>Coverage</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="(api, index) in reportData.api_details" :key="index" :class="getRowClass(api)" @click="showAPIDetail(api)">
+                                            <td><code>{{ api.invoked_api }}</code></td>
+                                            <td>{{ api.location }}</td>
+                                            <td>
+                                                <span :class="api.coverage === 'Yes' ? 'coverage-covered' : 'coverage-not-covered'">
+                                                    {{ api.coverage }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <div v-else-if="reportData">
+                            <p>No API details available in the reportData.</p>
+                        </div>
+                    </div>
+                    <div v-else class="detail-placeholder">
+                        <b>Select a command to view details</b>
+                    </div>
                 </div>
             </div>
 
@@ -139,123 +246,85 @@
                 <div class="app-command"> 
                     <b>Run Command</b>
                     <div class="command-container">
-                        <input 
-                            type="text"
-                            class="command-input"
-                            placeholder="Enter project run command"
-                            v-model="runCommand"
-                        />
+                        <button
+                            class="command-select-button"
+                            @click="openCommandModal(fileTree)"
+                            :disabled="!project"
+                        >
+                            {{ runCommand || 'Import run command...' }}
+                        </button>
                     </div>   
                 </div>
 
                 <button class="run-button" 
-                        :disabled="!project || !selectedLibrary || !runCommand"
-                        @click="runFixCommand">
-                    Run
-                </button>     
+                        :disabled="!project || !selectedLibrary || !runCommand || !configChanged"
+                        @click="runFixCommand()">
+                    {{ isRunningFix ? 'Running...' : (configChanged ? 'Run' : 'Fix Completed') }}
+                </button>    
+                
+                <div v-if="isRunningFix" class="fix-progress-container">
+                    <div class="progress-label">
+                        {{ fixProgressStep }}
+                    </div>
+                    <div class="progress-bar-background">
+                        <div class="progress-bar-fill"
+                         :style="{width: fixProgress + '%'}"></div>
+                    </div>
+                    <div class="progress-percentage">{{ fixProgress }}%</div>
+                </div>
+
+                <div v-if="fixError" class="error-message">
+                    {{ fixError }}
+                </div>
             </div>
         </div>
     </div>
 
     <!-- 环境导入窗口 -->
-    <div v-if="showImportModal" class="modal-overlay" @click="closeImportEnvModal">
-        <div class="modal-container" @click.stop>
-            <div class="modal-header">
-                <h3>Import {{selectedEnvType}} Environment</h3>
-                <button class="modal-close" @click="closeImportEnvModal">&times;</button>
-            </div>
+    <EnvironmentImportModal
+        :show-import-modal="showImportModal"
+        :selected-env-type="selectedEnvType"
+        :import-env-method="importEnvMethod"
+        :python-version="pythonVersion"
+        :requirement-file="requirementFile"
+        :condapack-file="condapackFile"
+        :is-creating-current-env="isCreatingCurrentEnv"
+        :current-creating-env-step="currentCreatingEnvStep"
+        :current-env-creation-progress="currentEnvCreationProgress"
+        :current-env-creation-error="currentEnvCreationError"
+        :is-creating-target-env="isCreatingTargetEnv"
+        :target-creating-env-step="targetCreatingEnvStep"
+        :target-env-creation-progress="targetEnvCreationProgress"
+        :target-env-creation-error="targetEnvCreationError"
+        @close-import-env-modal="closeImportEnvModal"
+        @handle-requirement-select="handleRequirementSelect"
+        @handle-condapack-select="handleCondapackSelect"
+        @create-environment="createEnvironment"
+    />
 
-            <div class="modal-body"> 
-                <div class="form-group">
-                    <label>Import Method:</label>
-                    <select v-model="importEnvMethod" class="form-control">
-                        <option value="requirements">From requirements.txt</option>
-                        <option value="environment">From environment.yml</option>
-                    </select>
-                </div>
-
-                <div v-if="importEnvMethod === 'requirements'" class="import-method-section">
-                    <div>
-                        <label>Python Version</label>
-                        <select v-model="pythonVersion" class="form-control">
-                            <option value="python3.8">Python 3.8</option>
-                            <option value="python3.9">Python 3.9</option>
-                            <option value="python3.10">Python 3.10</option>
-                            <option value="python3.11">Python 3.11</option>
-                            <option value="python3.12">Python 3.12</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Requirements File</label>
-                        <input type="file" accept=".txt" @change="handleRequirementSelect" class="file-input"/>
-                    </div>
-                </div>
-
-                <div v-else-if="importEnvMethod == 'environment'" class="import-method-section">
-                    <div class="form-group">
-                        <label>Environment YML File</label>
-                        <input type="file" accept=".yml" @change="handleEnvironmentSelect" class="file-input"/>
-                    </div>
-                </div>
-            </div>
-
-            <div v-if="selectedEnvType == 'current' ? isCreatingCurrentEnv : isCreatingTargetEnv" class="progress-section">
-                <div class="progress-label">
-                    {{selectedEnvType == 'current'? currentCreatingEnvStep : targetCreatingEnvStep}}
-                </div>
-                <div class="progress-bar-background">
-                    <div class="progress-bar-fill"
-                     :style="{width: (selectedEnvType == 'current' ? currentEnvCreationProgress : targetEnvCreationProgress) + '%'}"></div>
-                </div>
-            </div>
-
-            <div v-if="selectedEnvType == 'current' ? currentEnvCreationError : targetEnvCreationError" class="error-message">
-                {{selectedEnvType === 'current' ? currentEnvCreationError : targetEnvCreationError}}
-            </div>
-
-            <div class="modal-footer">
-                <button @click="closeImportEnvModal" class="cancel-button">Cancel</button>
-                <button
-                    @click="createEnvironment"
-                    class="confirm-button"
-                    :disabled="(importEnvMethod === 'requirements' && !requirementFile) ||
-                                (importEnvMethod === 'environment' && !environmentFile) ||  
-                                (selectedEnvType === 'current' ? isCreatingCurrentEnv : isCreatingTargetEnv)">
-                    {{(selectedEnvType === 'current' ? isCreatingCurrentEnv : isCreatingTargetEnv) ? 'Creating...' : 'Confirm'}}
-                </button>
-            </div>
-        </div>
-    </div>
     <!-- 虚拟环境详情窗口 -->
-    <div v-if="showEnvDetailsModal" class="modal-overlay" @click="closeEnvDetailsModal">
-        <div class="modal-container" @click.stop>
-            <div class="modal-header">
-                <h3>{{selectedEnvDetailsType}} Environment Details</h3>
-                <button class="modal-close" @click="closeEnvDetailsModal">&times;</button>
-            </div>
+    <EnvironmentDetailsModal
+        :show-env-details-modal="showEnvDetailsModal"
+        :env-details="envDetails"
+        :selected-env-details-type="selectedEnvDetailsType"
+        @close-env-details-modal="closeEnvDetailsModal"
+    />
 
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Python Version</label>
-                    <div class="env-detail-value">{{envDetails.pythonVersion}}</div>
-                </div>
+    <CommandSelectionModal
+        :show-command-modal="showCommandModal"
+        :project="fileTree"
+        :python-files="pythonFiles"
+        :selected-python-file="selectedPythonFile"
+        :additional-args="additionalArgs"
+        @closeCommandModal="closeCommandModal"
+        @saveCommand="saveCommand"
+    />
 
-                <div class="form-group">
-                    <label>Dependencies:</label>
-                    <div v-if="envDetails.dependencies && envDetails.dependencies.length > 0" class="dependencies-list">
-                        <div v-for="(dep, index) in envDetails.dependencies" :key="index" class="dependency-item">
-                            {{dep}}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button @click="closeEnvDetailsModal" class="cancel-button">Close</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    <APIDetailModal 
+    :show="showAPIDetailModal" 
+    :api-detail="selectedAPIDetail" 
+    @close="closeAPIDetailModal"
+    />
 </template>
 
 <script setup>
@@ -267,6 +336,8 @@ import TreeView from './components/TreeView.vue'
 import { 
     project, 
     fileTree, 
+    instrumentProject,
+    instrumentFileTree,
     uploadProgress, 
     isUploading, 
     currentFilePath, 
@@ -274,8 +345,9 @@ import {
     isContentModified,
     selectFolder,
     saveFile,
-    loadCurrentProject,
-    downloadProject
+    downloadProject,
+    currentProjectType,
+    fixCompleted
 } from './composables/projectManager'
 
 import { 
@@ -286,7 +358,7 @@ import {
     importEnvMethod,
     pythonVersion,
     requirementFile,
-    environmentFile,
+    condapackFile,
     isCreatingCurrentEnv,
     currentCreatingEnvStep,
     currentEnvCreationProgress,
@@ -301,15 +373,47 @@ import {
     openImportEnvModal,
     closeImportEnvModal,
     handleRequirementSelect,
-    handleEnvironmentSelect,
+    handleCondapackSelect,
     createEnvironment,
     openEnvDetailsModal,
     closeEnvDetailsModal,
     upgradLibraries,
-    environmentsReady
+    environmentsReady,
+    runCommand,
+    showCommandModal,
+    pythonFiles,
+    selectedPythonFile,
+    additionalArgs,
+    openCommandModal,
+    closeCommandModal,
+    saveCommand,
+    configChanged,
 } from './composables/configManager'
 
-import { showNotification } from './composables/utils'
+import { 
+    reportData,
+    getReport,
+    showAPIDetailModal,
+    closeAPIDetailModal,
+    showAPIDetail,
+    selectedAPIDetail
+} from './composables/detailManager'
+
+import {
+    selectedLibrary,
+    isRunningFix,
+    fixProgressStep,
+    fixProgress,
+    fixError,
+    getSelectedLibraryInfo,
+    runFixCommand
+} from './composables/fixManager'
+
+import CommandSelectionModal from './components/RunCommandModal.vue';
+import APIDetailModal from './components/APIDetailModal.vue';
+import EnvironmentImportModal from './components/EnvironmentImportModal.vue';
+import EnvironmentDetailsModal from './components/EnvironmentDetailsModal.vue';
+import { showNotification } from './composables/utils';
 
 // 项目视图状态
 const projectView = ref('project')
@@ -318,10 +422,6 @@ const projectView = ref('project')
 const editorRef = ref(null)
 let editor = null
 let handleKeyDown = null
-const runCommand = ref('')
-
-// 修复库相关
-const selectedLibrary = ref(null)
 
 const handleSelectedLibrary = computed({
     get(){
@@ -336,56 +436,22 @@ const handleSelectedLibrary = computed({
                 currentVersion: selectedLib.currentVersion,
                 targetVersion: selectedLib.targetVersion
             };
-    }else{
-        selectedLibrary.value = null;
-    }
+        }else{
+            selectedLibrary.value = null;
+        }
+
+        configChanged.value = true;
     }
 })
 
-const getSelectedLibraryInfo = () =>{
-    if(selectedLibrary.value){
-        return `${selectedLibrary.value.name}: ${selectedLibrary.value.currentVersion} -> ${selectedLibrary.value.targetVersion}`
-    }
-    return ''
-}
-
-// 运行修复命令
-const runFixCommand = async() => {
-    const configData = {
-        projectName: project.value,
-        libName: selectedLibrary.value.name,
-        currentVersion: selectedLibrary.value.currentVersion,
-        targetVersion: selectedLibrary.value.targetVersion,
-        runCommand: runCommand.value
-    }
-
-    try{
-        const response = await fetch('http://localhost:5000/fix/run_fix',{
-            method:'POST',
-            'headers':{
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(configData)
-        })
-
-        if(response.ok){
-            const result = await response.json();
-
-            if(result.status === 'success'){
-                showNotification('Fix executed successfully', 'success');
-            }else{
-                showNotification('Failed to fix' + result.message, 'error');
-                throw new Error(`Failed to fix: ${result.message}`);      
-            }
-        }else{
-            const result = await response.json();
-            showNotification('Failed to fix' + result.error, 'error');
-            throw new Error(`Failed to fix: ${result.error}`); 
-        }  
-    }catch(error){
-        console.error('Failed to fix', error);
-        showNotification('Failed to fix:' + error.message, 'error');
-    }
+const getRowClass = (api) => {
+  if (api.coverage === 'No' || api.coverage === 'no' || api.coverage === false) {
+    return 'uncovered-row';
+  } else if (api.compatible) {
+    return 'covered-compatible-row';
+  } else {
+    return 'covered-incompatible-row';
+  }
 }
 
 onMounted(() => { 
@@ -418,14 +484,12 @@ onMounted(() => {
         if(e.ctrlKey && e.key === 's'){
             e.preventDefault();
             if(currentFilePath.value && isContentModified.value){
-                saveFile();
+                saveFile(currentProjectType.value);
             }
         }
     }
 
     document.addEventListener('keydown', handleKeyDown);
-
-    loadCurrentProject();
 })
 
 onUnmounted(() => {
@@ -445,4 +509,5 @@ onUnmounted(() => {
 @use "./styles/_config.scss";
 @use "./styles/_editor.scss";
 @use "./styles/_modal.scss";
+@use "./styles/_detail.scss";
 </style>

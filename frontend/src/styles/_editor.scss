@@ -1,13 +1,4 @@
 /* 代码编辑栏 */
-.app-code{
-    height: 500px;
-    padding: 10px;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-    border: 1px solid #e0e0e0;
-}
-
 .editor-container{
     flex: 1;
     border-radius: 5px;
@@ -26,12 +17,4 @@
 .editor-container.disabled{
     opacity: 0.5;
     pointer-events: none;
-}
-
-/* 终端栏 */
-.app-terminal{
-    height: calc(100vh - 400px);
-    position: relative;
-    flex: 1;
-    overflow: auto;
 }

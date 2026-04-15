@@ -1,15 +1,16 @@
-import { computed, ref } from 'vue'
+import { computed, ref, reactive } from 'vue'
 import { showNotification } from './utils'
+import { resetFixState } from './fixManager'
 
 // 虚拟环境相关状态
 const showImportModal = ref(false)
-const importEnvMethod = ref('requirements')
+const importEnvMethod = ref('condapack')
 const selectedEnvType = ref(null)
 
 const pythonVersion = ref('python3.12')
 const requirementFile = ref(null)
 
-const environmentFile = ref(null)
+const condapackFile = ref(null)
 
 const isCreatingCurrentEnv = ref(false)
 const currentCreatingEnvStep = ref('Initializing')
@@ -31,12 +32,14 @@ const targetEnv = ref({
     path: ''
 })
 
+const configChanged = ref(true)
+
 // 打开导入环境窗口
 export const openImportEnvModal = (envType) => {
     selectedEnvType.value = envType;
     showImportModal.value = true;
     requirementFile.value = null;
-    environmentFile.value = null;
+    condapackFile.value = null;
 }
 
 // 关闭导入环境窗口
@@ -59,14 +62,14 @@ export const handleRequirementSelect = (e) => {
     }
 }
 
-export const handleEnvironmentSelect = (e) => {
+export const handleCondapackSelect = (e) => {
     const file = e.target.files[0];
 
-    if(importEnvMethod.value === 'environment'){
-        if(file && file.name.toLowerCase().endsWith('.yml')){
-            environmentFile.value = file;
+    if(importEnvMethod.value === 'condapack'){
+        if(file && (file.name.toLowerCase().endsWith('.tar') || file.name.toLowerCase().endsWith('.tar.gz') || file.name.toLowerCase().endsWith('.tgz'))){
+            condapackFile.value = file;
         }else{
-            showNotification('Please select a valid .yml file', 'warning');
+            showNotification('Please select a valid conda pack file(.tar, .tar.gz, or .tgz)', 'warning');
             e.target.value = '';
         }
     }
@@ -79,25 +82,29 @@ export const createEnvironment = async() => {
             showNotification('Please select a requirements.txt file', 'warning');
             return;
         }
-    }else if(importEnvMethod.value === 'environment'){
-        if(!environmentFile.value){
-            showNotification('Please select a environment.yml file', 'warning');
+    }else if(importEnvMethod.value === 'condapack'){
+        if(!condapackFile.value){
+            showNotification('Please select a conda pack file', 'warning');
             return;
         }
     }
     
     if(selectedEnvType.value === 'current'){
+        currentEnv.value.path = '';
         isCreatingCurrentEnv.value = true;
         currentEnvCreationError.value = '';
         currentEnvCreationProgress.value = 0;
         currentCreatingEnvStep.value = 'Creating virtual environment'
     }else{
+        targetEnv.value.path = '';
         isCreatingTargetEnv.value = true;
         targetEnvCreationError.value = '';
         targetEnvCreationProgress.value = 0;
         targetCreatingEnvStep.value = 'Creating virtual environment' 
     }
     
+    configChanged.value = true;
+    resetFixState();
 
     try{
         const formData = new FormData();
@@ -107,11 +114,11 @@ export const createEnvironment = async() => {
 
         if(importEnvMethod.value === 'requirements'){
             formData.append('requirements', requirementFile.value);
-        }else if(importEnvMethod.value === 'environment'){
-            formData.append('environment', environmentFile.value);
+        }else if(importEnvMethod.value === 'condapack'){
+            formData.append('condapack', condapackFile.value);
         }
 
-        const response = await fetch('http://localhost:5000/venv/create', {
+        const response = await fetch('/venv/create', {
             method: 'POST',
             body: formData
         })
@@ -308,16 +315,71 @@ const environmentsReady = computed(() => {
     return currentEnv.value.path && targetEnv.value.path
 })
 
+const runCommand = ref('')
+const runFilePath = ref('')
+const showCommandModal = ref(false)
+const pythonFiles = ref([])
+const selectedPythonFile = ref('')
+const additionalArgs = ref('')
+
+// 提取 Python 文件的函数
+const extractPythonFiles = (treeNode, currentPath = '') => {
+    let files = []
+  
+    if (treeNode.type === 'file' && treeNode.name.endsWith('.py')) {
+        files.push(currentPath ? `${currentPath}/${treeNode.name}` : treeNode.name)
+    } else if (treeNode.children) {
+        const sortedChildren = [...treeNode.children].sort((a, b) => a.name.localeCompare(b.name));
+
+        for (const child of sortedChildren) {
+            const childPath = currentPath ? `${currentPath}/${treeNode.name}` : treeNode.name
+            files = files.concat(extractPythonFiles(child, childPath))
+        }
+    }
+  
+    return files
+}
+
+// 更新项目时提取 Python 文件
+const updatePythonFiles = (fileTree) => {
+    if (fileTree) {
+        pythonFiles.value = extractPythonFiles(fileTree, '')
+    } else {
+        pythonFiles.value = []
+    }
+}
+
+// 打开命令导入窗口
+const openCommandModal = (fileTree) => {
+    if (fileTree) {
+        updatePythonFiles(fileTree)
+        showCommandModal.value = true
+    }
+}
+
+// 关闭命令导入窗口
+const closeCommandModal = () => {
+    showCommandModal.value = false
+}
+
+// 保存命令
+const saveCommand = (command, filePath) => {
+    runCommand.value = command;
+    runFilePath.value = filePath;
+    configChanged.value = true;
+    closeCommandModal();
+}
+
 // 导出相关状态
 export {
     showImportModal,
     currentEnv,
     targetEnv,
-    importEnvMethod,
     selectedEnvType,
+    importEnvMethod,
     pythonVersion,
     requirementFile,
-    environmentFile,
+    condapackFile,
     isCreatingCurrentEnv,
     currentCreatingEnvStep,
     currentEnvCreationProgress,
@@ -330,5 +392,16 @@ export {
     envDetails,
     selectedEnvDetailsType,
     upgradLibraries,
-    environmentsReady,
+    environmentsReady, 
+    runCommand,
+    runFilePath,
+    showCommandModal,
+    pythonFiles,
+    selectedPythonFile,
+    additionalArgs,
+    configChanged,
+    openCommandModal,
+    closeCommandModal,
+    saveCommand,
+    updatePythonFiles
 }
