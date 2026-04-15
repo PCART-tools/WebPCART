@@ -34,6 +34,10 @@ const targetEnv = ref({
 
 const configChanged = ref(true)
 
+// 分片上传配置
+const CHUNK_SIZE = 50 * 1024 * 1024
+const UPLOAD_CONCURRENCY = 3;
+
 // 打开导入环境窗口
 export const openImportEnvModal = (envType) => {
     selectedEnvType.value = envType;
@@ -75,6 +79,255 @@ export const handleCondapackSelect = (e) => {
     }
 }
 
+// 初始化上传会话
+async function initUploadSession(filename, fileSize, totalChunks, envType) {
+    const response = await fetch('/venv/init_upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+            filename,
+            fileSize,
+            totalChunks,
+            envType
+        })
+    });
+    
+    if (!response.ok) {
+        throw new Error(`Failed to initialize upload: ${response.statusText}`);
+    }
+    
+    return await response.json();
+}
+
+// 上传单个分片
+async function uploadChunk(chunk, uploadSessionId, chunkIndex, totalChunks) {
+    const formData = new FormData();
+    formData.append('chunk', chunk, `chunk_${chunkIndex}`);
+    formData.append('uploadSessionId', uploadSessionId);
+    formData.append('chunkIndex', chunkIndex.toString());
+    formData.append('totalChunks', totalChunks.toString());
+    
+    const response = await fetch('/venv/upload_chunk', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData
+    });
+    
+    if (!response.ok) {
+        throw new Error(`Chunk ${chunkIndex} upload failed: ${response.statusText}`);
+    }
+    
+    return await response.json();
+}
+
+// 取消上传会话
+async function cancelUploadSession(uploadSessionId) {
+    try {
+        await fetch('/venv/cancel_upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ uploadSessionId })
+        });
+    } catch (error) {
+        console.error('Failed to cancel upload:', error);
+    }
+}
+
+// 分片上传文件
+async function uploadFileInChunks(file, envType, onProgress) {
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    let uploadedChunks = 0;
+    let uploadSessionId = null;
+    
+    try {
+        // 初始化上传会话
+        onProgress?.({ 
+            progress: 0, 
+            step: 'Initializing upload session',
+            message: '准备上传...'
+        });
+        
+        const initData = await initUploadSession(file.name, file.size, totalChunks, envType);
+        uploadSessionId = initData.uploadSessionId;
+        
+        // 并行上传分片
+        const uploadSingleChunk = async (chunkIndex) => {
+            const start = chunkIndex * CHUNK_SIZE;
+            const end = Math.min(start + CHUNK_SIZE, file.size);
+            const chunk = file.slice(start, end);
+            
+            const result = await uploadChunk(chunk, uploadSessionId, chunkIndex, totalChunks);
+            uploadedChunks++;
+            
+            const progress = (uploadedChunks / totalChunks) * 60; 
+            const uploadedMB = (uploadedChunks * CHUNK_SIZE) / (1024 * 1024);
+            const totalMB = file.size / (1024 * 1024);
+            
+            onProgress?.({
+                progress: Math.min(progress, 60),
+                step: `Uploading chunks (${uploadedChunks}/${totalChunks})`,
+                message: `上传中: ${uploadedMB.toFixed(1)}MB / ${totalMB.toFixed(1)}MB`
+            });
+            
+            return result;
+        };
+        
+        // 分批并行上传
+        for (let i = 0; i < totalChunks; i += UPLOAD_CONCURRENCY) {
+            const batchPromises = [];
+            for (let j = 0; j < UPLOAD_CONCURRENCY && i + j < totalChunks; j++) {
+                batchPromises.push(uploadSingleChunk(i + j));
+            }
+            await Promise.all(batchPromises);
+        }
+        
+        onProgress?.({
+            progress: 60,
+            step: 'All chunks uploaded',
+            message: '所有分片上传完成，准备合并...'
+        });
+        
+        return uploadSessionId;
+        
+    } catch (error) {
+        // 取消上传会话
+        if (uploadSessionId) {
+            await cancelUploadSession(uploadSessionId);
+        }
+        throw error;
+    }
+}
+
+// 处理 SSE 流响应
+function handleSSEStream(reader, decoder, envType, onSuccess, onError, onProgress) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            while(true){
+                const {done, value} = await reader.read();
+                if(done) break;
+
+                const chunk = decoder.decode(value, {stream: true});
+                const lines = chunk.split('\n');
+
+                for(const line of lines){
+                    if(line.startsWith('data: ')){
+                        try{
+                            const data = JSON.parse(line.substring(6));
+
+                            if(data.status === 'progress'){
+                                onProgress?.(data.step, data.progress);
+                            }else if(data.status === 'error'){
+                                const errorMsg = data.message.replace(/\u001b\[[0-9;]*m/g, '');
+                                onError(errorMsg);
+                                reject(new Error(errorMsg));
+                                return;
+                            }else if(data.status === 'success'){
+                                onSuccess(data);
+                                resolve(data);
+                                return;
+                            }
+                            
+                        }catch(e){
+                            console.error('Error parsing JSON:', e);
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
+// 使用 requirements.txt 创建环境
+async function createEnvWithRequirements(envType, requirementsFile, pythonVersion, updateProgress, setError, setSuccess) {
+    const formData = new FormData();
+    formData.append('importEnvMethod', 'requirements');
+    formData.append('envType', envType);
+    formData.append('pythonVersion', pythonVersion);
+    formData.append('requirements', requirementsFile);
+
+    const response = await fetch('/venv/create', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData
+    });
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    await handleSSEStream(
+        reader,
+        decoder,
+        envType,
+        (data) => {
+            setSuccess({
+                pythonVersion: data.pythonVersion,
+                dependencies: data.dependencies || [],
+                path: data.path
+            });
+        },
+        (errorMsg) => {
+            setError(errorMsg);
+        },
+        (step, progress) => {
+            updateProgress(step, progress);
+        }
+    );
+}
+
+// 使用 conda pack 创建环境
+async function createEnvWithCondaPack(envType, condapackFile, updateProgress, setError, setSuccess) {
+    // 分片上传
+    const uploadSessionId = await uploadFileInChunks(
+        condapackFile,
+        envType,
+        (progressData) => {
+            updateProgress(progressData.step, progressData.progress);
+        }
+    );
+
+    // 完成上传并处理
+    const completeResponse = await fetch('/venv/complete_upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+            uploadSessionId,
+            envType: envType
+        })
+    });
+
+    if (!completeResponse.ok) {
+        throw new Error(`Failed to complete upload: ${completeResponse.statusText}`);
+    }
+
+    const reader = completeResponse.body.getReader();
+    const decoder = new TextDecoder();
+
+    await handleSSEStream(
+        reader,
+        decoder,
+        envType,
+        (data) => {
+            setSuccess({
+                pythonVersion: data.pythonVersion,
+                dependencies: data.dependencies || [],
+                path: data.path
+            });
+        },
+        (errorMsg) => {
+            setError(errorMsg);
+        },
+        (step, progress) => {
+            const adjustedProgress = 60 + (progress * 0.4);
+            updateProgress(step, adjustedProgress);
+        }
+    );
+}
+
 // 创建虚拟环境
 export const createEnvironment = async() => {
     if(importEnvMethod.value === 'requirements'){
@@ -89,128 +342,96 @@ export const createEnvironment = async() => {
         }
     }
     
-    if(selectedEnvType.value === 'current'){
+    const isCurrent = selectedEnvType.value === 'current';
+    
+    // 设置初始状态
+    if(isCurrent){
         currentEnv.value.path = '';
         isCreatingCurrentEnv.value = true;
         currentEnvCreationError.value = '';
         currentEnvCreationProgress.value = 0;
-        currentCreatingEnvStep.value = 'Creating virtual environment'
+        currentCreatingEnvStep.value = 'Creating virtual environment';
     }else{
         targetEnv.value.path = '';
         isCreatingTargetEnv.value = true;
         targetEnvCreationError.value = '';
         targetEnvCreationProgress.value = 0;
-        targetCreatingEnvStep.value = 'Creating virtual environment' 
+        targetCreatingEnvStep.value = 'Creating virtual environment'; 
     }
     
     configChanged.value = true;
     resetFixState();
 
-    try{
-        const formData = new FormData();
-        formData.append('importEnvMethod', importEnvMethod.value);
-        formData.append('envType', selectedEnvType.value);
-        formData.append('pythonVersion', pythonVersion.value);
-
-        if(importEnvMethod.value === 'requirements'){
-            formData.append('requirements', requirementFile.value);
-        }else if(importEnvMethod.value === 'condapack'){
-            formData.append('condapack', condapackFile.value);
+    // 定义状态更新函数
+    const updateProgress = (step, progress) => {
+        if(isCurrent){
+            currentCreatingEnvStep.value = step;
+            currentEnvCreationProgress.value = progress;
+        }else{
+            targetCreatingEnvStep.value = step;
+            targetEnvCreationProgress.value = progress;
         }
+    };
 
-        const response = await fetch('/venv/create', {
-            method: 'POST',
-            credentials: 'include',
-            body: formData
-        })
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-
-        // 持续获取创建进度
-        while(true){
-            const {done, value} = await reader.read();
-            if(done) break;
-
-            const chunk = decoder.decode(value, {stream: true});
-            const lines = chunk.split('\n');
-
-            for(const line of lines){
-                if(line.startsWith('data: ')){
-                    try{
-                        const data = JSON.parse(line.substring(6));
-
-                        if(data.type == 'current'){
-                            if(data.status === 'progress'){
-                                currentCreatingEnvStep.value = data.step;
-                                currentEnvCreationProgress.value = data.progress;
-                            }else if(data.status === 'error'){
-                                currentEnvCreationError.value = data.message.replace(/\u001b\[[0-9;]*m/g, '');  // 去除ANSI控制字符
-                                isCreatingCurrentEnv.value = false;
-                                return;
-                            }else if(data.status === 'success'){
-                                currentEnvCreationProgress.value = 100;
-                                currentCreatingEnvStep.value = 'Environment created successfully';
-
-                                currentEnv.value = {
-                                    pythonVersion: data.pythonVersion,
-                                    dependencies: data.dependencies || [],
-                                    path: data.path
-                                };
-
-                                setTimeout(() => {
-                                    showNotification(`Current environment created successfully`, 'success')
-                                    closeImportEnvModal();
-                                }, 1000);
-
-                                isCreatingCurrentEnv.value = false;
-                                return;
-                            }
-                        }else{
-                            if(data.status === 'progress'){
-                                targetCreatingEnvStep.value = data.step;
-                                targetEnvCreationProgress.value = data.progress;
-                            }else if(data.status === 'error'){
-                                targetEnvCreationError.value = data.message.replace(/\u001b\[[0-9;]*m/g, '');  // 去除ANSI控制字符
-                                isCreatingTargetEnv.value = false;
-                                return;
-                            }else if(data.status === 'success'){
-                                targetEnvCreationProgress.value = 100;
-                                targetCreatingEnvStep.value = 'Environment created successfully';
-
-                                targetEnv.value = {
-                                    pythonVersion: data.pythonVersion,
-                                    dependencies: data.dependencies || [],
-                                    path: data.path
-                                };
-
-                                setTimeout(() => {
-                                    showNotification(`Target environment created successfully`, 'success')
-                                    closeImportEnvModal();
-                                }, 1000);
-
-                                isCreatingTargetEnv.value = false;
-                                return;
-                            }                                
-                        }
-                        
-                    }catch(e){
-                        console.error('Error parsing JSON:', e);
-                    }
-                }
-            }
-        }
-    }catch(error){
-        if(selectedEnvType.value == 'current'){
-            currentEnvCreationError.value = error.message;
+    const setError = (errorMsg) => {
+        if(isCurrent){
+            currentEnvCreationError.value = errorMsg;
             isCreatingCurrentEnv.value = false;
         }else{
-            targetEnvCreationError.value = error.message;
+            targetEnvCreationError.value = errorMsg;
             isCreatingTargetEnv.value = false;
         }
+    };
 
+    const setSuccess = (envData) => {
+        if(isCurrent){
+            currentEnvCreationProgress.value = 100;
+            currentCreatingEnvStep.value = 'Environment created successfully';
+            currentEnv.value = envData;
+
+            setTimeout(() => {
+                showNotification(`Current environment created successfully`, 'success');
+                closeImportEnvModal();
+            }, 1000);
+
+            isCreatingCurrentEnv.value = false;
+        }else{
+            targetEnvCreationProgress.value = 100;
+            targetCreatingEnvStep.value = 'Environment created successfully';
+            targetEnv.value = envData;
+
+            setTimeout(() => {
+                showNotification(`Target environment created successfully`, 'success');
+                closeImportEnvModal();
+            }, 1000);
+
+            isCreatingTargetEnv.value = false;
+        }
+    };
+
+    try{
+        if(importEnvMethod.value === 'requirements'){
+            await createEnvWithRequirements(
+                selectedEnvType.value,
+                requirementFile.value,
+                pythonVersion.value,
+                updateProgress,
+                setError,
+                setSuccess
+            );
+        }else if(importEnvMethod.value === 'condapack'){
+            await createEnvWithCondaPack(
+                selectedEnvType.value,
+                condapackFile.value,
+                updateProgress,
+                setError,
+                setSuccess
+            );
+        }
+    }catch(error){
+        setError(error.message);
         console.error('Error creating environment:', error);
-        showNotification(`Failed to create ${selectedEnvType.value} environment: `, 'error');
+        showNotification(`Failed to create ${selectedEnvType.value} environment: ${error.message}`, 'error');
     }
 }
 

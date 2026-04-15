@@ -3,17 +3,17 @@
         <!-- 功能栏 -->
         <div class="function-bar">
             <b>WebPCART</b>
-            <!-- <div class="function-buttons">
-                <button @click="showInfo('setting')" title="setting">
-                    <i class="fas fa-cog"></i>
-                </button>
-                <button @click="showInfo('help')" title="help">
+            <div class="function-buttons">
+                <button @click="showHelpModal" title="help">
                     <i class="fas fa-question-circle"></i>
+                </button>
+                <!-- <button @click="showInfo('setting')" title="setting">
+                    <i class="fas fa-cog"></i>
                 </button>
                 <button @click="showInfo('about')" title="about">
                     <i class="fas fa-info-circle"></i>
-                </button>
-            </div> -->
+                </button> -->
+            </div>
         </div>
 
         <!-- 网页主体 -->
@@ -333,6 +333,11 @@
     :api-detail="selectedAPIDetail" 
     @close="closeAPIDetailModal"
     />
+
+    <HelpModal
+    :show="showHelp"
+    @close="closeHelpModal"
+    />
 </template>
 
 <script setup>
@@ -417,6 +422,13 @@ import {
     runFixCommand
 } from './composables/fixManager'
 
+import {
+    showHelp,
+    showHelpModal,
+    closeHelpModal
+} from './composables/toolManager'
+
+import HelpModal from './components/HelpModal.vue'
 import CommandSelectionModal from './components/RunCommandModal.vue';
 import APIDetailModal from './components/APIDetailModal.vue';
 import EnvironmentImportModal from './components/EnvironmentImportModal.vue';
