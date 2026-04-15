@@ -2,7 +2,7 @@
   <div v-if="showImportModal" class="modal-overlay" @click="closeImportEnvModal">
     <div class="modal-container" @click.stop>
       <div class="modal-header">
-        <h3>Import {{selectedEnvType}} Environment</h3>
+        <h3>Import {{capitalizedEnvType}} Environment</h3>
         <button class="modal-close" @click="closeImportEnvModal">&times;</button>
       </div>
 
@@ -11,7 +11,7 @@
           <label>Import Method:</label>
           <select :value="importEnvMethod" @change="updateImportEnvMethod" class="form-control">
             <option value="requirements">From requirements.txt</option>
-            <option value="condapack">From condapack</option>
+            <option value="condapack">From Conda Pack</option>
           </select>
         </div>
 
@@ -33,7 +33,7 @@
           </div>
         </div>
 
-        <div v-else-if="importEnvMethod == 'condapack'" class="import-method-section">
+        <div v-else-if="importEnvMethod === 'condapack'" class="import-method-section">
           <div class="form-group">
             <label>Conda Pack File</label>
             <input type="file" accept=".tar,.tar.gz,.tgz" @change="handleCondapackSelect" class="file-input"/>
@@ -71,6 +71,8 @@
 </template>
 
 <script setup>
+import { computed } from 'vue';
+
 const emit = defineEmits([
   'closeImportEnvModal',
   'handleRequirementSelect',
@@ -80,7 +82,7 @@ const emit = defineEmits([
   'update:pythonVersion'
 ]);
 
-defineProps({
+const props = defineProps({
   showImportModal: {
     type: Boolean,
     default: false
@@ -156,12 +158,22 @@ const createEnvironment = () => {
 };
 
 const updateImportEnvMethod = (event) => {
-  emit('update:importEnvMethod', event.target.value);
+  const newValue = event.target.value;
+  emit('update:importEnvMethod', newValue);
+  
+  if (newValue === 'condapack') {
+    emit('update:pythonVersion', '');
+  }
 };
 
 const updatePythonVersion = (event) => {
   emit('update:pythonVersion', event.target.value);
 };
+
+const capitalizedEnvType = computed(() => {
+  if (!props.selectedEnvType) return '';
+  return props.selectedEnvType.charAt(0).toUpperCase() + props.selectedEnvType.slice(1);
+});
 </script>
 
 <style scoped>

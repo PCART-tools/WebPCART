@@ -1,9 +1,16 @@
 FROM python:3.9-slim
 
+ENV DEBIAN_FRONTEND=noninteractive \
+    APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=DontWarn \
+    CONDA_DEFAULT_CHANNEL=https://mirrors.tuna.tsinghua.edu.cn/anaconda \
+    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+    PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
+
 WORKDIR /app
 
-# 安装必要的依赖
-RUN apt-get update && apt-get install -y \
+RUN apt-get update -o Acquire::Sources::List="deb https://mirrors.aliyun.com/debian/ bullseye main contrib non-free" \
+                   -o Acquire::Sources::SecurityList="deb https://mirrors.aliyun.com/debian-security/ bullseye-security main contrib non-free" && \
+    apt-get install -y --no-install-recommends \
     wget \
     bzip2 \
     ca-certificates \
@@ -14,28 +21,32 @@ RUN apt-get update && apt-get install -y \
     libgomp1 \
     gcc \
     g++ \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# 下载并安装Miniconda
-RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh && \
+RUN wget --no-check-certificate https://mirrors.tuna.tsinghua.edu.cn/anaconda/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh && \
     bash miniconda.sh -b -p /opt/conda && \
-    rm miniconda.sh
+    rm -f miniconda.sh && \
+    /opt/conda/bin/conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main && \
+    /opt/conda/bin/conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/r && \
+    /opt/conda/bin/conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/msys2 && \
+    /opt/conda/bin/conda config --set show_channel_urls yes && \
+    /opt/conda/bin/conda clean -afy
 
-# 将conda添加到PATH
 ENV PATH="/opt/conda/bin:${PATH}"
 
-COPY backend/requirements.txt requirements.txt
+COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt && \
+    rm -rf ~/.cache/pip
 
 COPY backend/ ./backend/
 COPY pcart/ ./pcart/
 
 WORKDIR /app/backend
+RUN mkdir -p ./data/{venv,projects,projects_copy,reports,projects_instrument} && \
+    mkdir -p ../pcart/{Configure,Copy,Report}
 
 EXPOSE 5000
-
-RUN mkdir -p ./data/venv ./data/projects ./data/projects_copy ./data/reports ./data/projects_instrument && \
-    mkdir -p ../pcart/Configure ../pcart/Copy ../pcart/Report
 
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "600", "--max-requests", "1000", "--max-requests-jitter", "100", "run:app"]

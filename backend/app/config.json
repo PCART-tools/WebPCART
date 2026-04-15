@@ -1,10 +1,12 @@
 {
-  "conda_path": "/home/wyh/miniconda3/condabin/conda",
+  "conda_path": "/home/wyh/miniconda3/condabin/conda",  
   "env_base_path": "./data/venv",
   "fix_config_base_path": "../pcart/Configure",
   "project_base_path": "./data/projects",
   "project_copy_path": "./data/projects_copy",
   "report_base_path": "./data/reports",
   "project_instrument_path": "./data/projects_instrument",
-  "fix_work_dir": "../pcart"
+  "fix_work_dir": "../pcart",
+  "cleanup_interval_hours": 2,
+  "file_expiry_hours": 3
 }

@@ -11,6 +11,7 @@ fix_bp = Blueprint('fix', __name__)
 
 WORK_DIR = get_work_dir()
 CONFIG_BASE_PATH = get_config_base_path()
+
 # 读取配置文件
 def get_paths():
     ENV_BASE_PATH = get_env_base_path()
@@ -44,6 +45,24 @@ def generate_fix_config(projectName, selectedLibrary, fix_command, run_file_path
 
     return config_file_path
 
+# 执行修复命令
+def run_fix_command(python_cmd, project_path, env_path): 
+    timeout = 600
+   
+    try:
+        result = subprocess.run(
+            python_cmd,
+            cwd=WORK_DIR,
+            capture_output=True,
+            text=True,
+            timeout=timeout
+        )
+        
+        return result
+    except Exception as e:
+        logger.error(f"Execution error: {str(e)}")
+        raise
+
 @fix_bp.route('/fix/run_fix', methods=['POST'])
 def run_fix():
     data = request.get_json()
@@ -66,6 +85,7 @@ def run_fix():
             yield f"data: {json.dumps({'status': 'progress', 'step': 'Building the configuration file', 'progress': 10})}\n\n"
 
             project_path = os.path.join(PROJECT_BASE_PATH, project_name)
+
             config_file_path = generate_fix_config(project_name, selected_library, run_command, run_file_path, project_path, ENV_BASE_PATH)
 
             if fix_completed:
@@ -82,7 +102,7 @@ def run_fix():
                     shutil.copytree(backup_path, project_path)
                     logger.info(f"Project restored from backup: {backup_path} -> {project_path}")
                 else:
-                    error_msg = f"Error: Backup project does not exist {backup_path}"
+                    error_msg = f"Error: Backup project does not exist or has expired"
                     logger.error(error_msg)
                     yield f"data: {json.dumps({'status': 'error', 'message': error_msg})}\n\n"
                     return
@@ -100,10 +120,20 @@ def run_fix():
                     shutil.copytree(project_path, backup_path)
                     logger.info(f"Project backed up from {project_path} to {backup_path}")
                 else:
-                    error_msg = f"Error: Original project path does not exist {project_path}"
+                    error_msg = f"Error: Original project path does not exist or has expired"
                     logger.error(error_msg)
                     yield f"data: {json.dumps({'status': 'error', 'message': error_msg})}\n\n"
                     return
+
+            # 检查运行文件是否存在
+            run_file = run_command.split()[1]
+            full_run_file_path = os.path.join(project_path, run_file_path, run_file)
+            logger.info(f"run_file_path: {full_run_file_path}")
+            if not os.path.exists(full_run_file_path):
+                error_msg = f"Error: Run file does not exist: {run_file}"
+                logger.error(error_msg)
+                yield f"data: {json.dumps({'status': 'error', 'message': error_msg})}\n\n"
+                return  
             
             yield f"data: {json.dumps({'status': 'progress', 'step': 'Running the repair program', 'progress': 45})}\n\n"
             
@@ -116,34 +146,46 @@ def run_fix():
             
             # 检查配置文件是否存在
             if not os.path.exists(config_file_path):
-                error_msg = f"Error: Configuration file does not exist {config_file_path}"
+                error_msg = f"Error: Configuration file does not exist or or has expired"
                 logger.error(error_msg)
                 yield f"data: {json.dumps({'status': 'error', 'message': error_msg})}\n\n"
                 return
+
+            # 检查报告文件目录存在
+            report_dir = os.path.join(WORK_DIR, 'Report')
+            os.makedirs(report_dir, exist_ok=True)
                 
             # 检查PCART程序是否存在
             if not os.path.exists(pcart_path):
-                error_msg = f"Error: PCART main file does not exist {pcart_path}"
+                error_msg = f"Error: PCART main file does not exist"
                 logger.error(error_msg)
                 yield f"data: {json.dumps({'status': 'error', 'message': error_msg})}\n\n"
                 return
             
             # 执行修复程序
-            result = subprocess.run(
-                cmd,
-                cwd=WORK_DIR,
-                capture_output=True,
-                text=True,
-                timeout=600
-            )
+            result = run_fix_command(cmd, project_path, ENV_BASE_PATH)
             
             logger.info(f"Repair completed, return code: {result.returncode}")
             logger.info(f"STDOUT: {result.stdout}")
-            if result.stderr:
-                logger.error(f"STDERR: {result.stderr}")
             
-            if result.returncode == 0:
+            repair_success = True
+            error_detail = ""
+            
+            # 判断修复是否成功
+            if result.returncode != 0:
+                repair_success = False
+                error_detail = result.stderr if result.stderr else f"Return code: {result.returncode}"
+            elif result.stdout and ('Traceback' in result.stdout or 'Error' in result.stdout or 'Failure' in result.stdout):
+                repair_success = False
+                error_detail = result.stdout
+            elif result.stderr and result.stderr.strip():
+                repair_success = False
+                error_detail = result.stderr
+            
+            if repair_success:
                 logger.info(f"PCART repair successful")
+                if result.stdout:
+                    yield f"data: {json.dumps({'status': 'log', 'content': result.stdout})}\n\n"
                 
                 yield f"data: {json.dumps({'status': 'progress', 'step': 'Post-processing results', 'progress': 80})}\n\n"
                 
@@ -183,7 +225,7 @@ def run_fix():
                 
                 yield f"data: {json.dumps({'status': 'success', 'message': 'Fix completed successfully', 'progress': 100})}\n\n"
             else:
-                error_msg = f"PCART repair failed, return code: {result.returncode}"
+                error_msg = f"PCART repair failed: {error_detail}"  
                 logger.error(error_msg)
                 yield f"data: {json.dumps({'status': 'error', 'message': error_msg})}\n\n"
         except subprocess.TimeoutExpired:

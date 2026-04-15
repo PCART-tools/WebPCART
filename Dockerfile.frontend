@@ -5,9 +5,14 @@ RUN npm config set registry https://registry.npmmirror.com
 WORKDIR /app
 
 COPY frontend/package*.json ./
+
+RUN npm install
+
 COPY frontend/ ./
 
-RUN npm install && npm run build
+ENV VITE_API_URL=http://backend:5000
+
+RUN  npm run build
 
 FROM nginx:alpine
 

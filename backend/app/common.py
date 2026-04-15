@@ -3,6 +3,9 @@ import json
 import logging
 import shutil
 from flask import g, session, request
+import threading
+import time
+import subprocess
 
 # 设置日志配置
 logging.basicConfig(level=logging.INFO)
@@ -17,15 +20,7 @@ def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(name)
 
 def get_user_id():
-    if hasattr(g, 'user_id'):
-        return g.user_id
-    user_id = session.get('user_id')
-    if not user_id:
-        import uuid
-        user_id = str(uuid.uuid4())
-        session['user_id'] = user_id
-        g.user_id = user_id
-    return user_id
+    return session.get('user_id')
 
 
 def get_project_base_path():
@@ -135,31 +130,18 @@ def get_conda_path():
     
     # 如果所有路径都不存在，返回配置文件中的原始路径
     return configured_path
-
+    
+# 初始化时清理所有数据目录
 def clean_directories():
     # 获取基础路径
     base_backend_path = os.path.join(os.path.dirname(__file__), '..')
-    base_pcart_path = os.path.normpath(os.path.join(os.path.dirname(__file__), config['fix_work_dir']))
-    
-    directories_to_clean = [
-        os.path.join(base_backend_path, config['project_base_path']),  # ./data/projects
-        os.path.join(base_backend_path, config['project_copy_path']),  # ./data/projects_copy
-        os.path.join(base_backend_path, config['report_base_path']),   # ./data/reports
-        os.path.join(base_backend_path, config['project_instrument_path']),  # ./data/projects_instrument
-        os.path.join(base_pcart_path, 'Configure'),  # ../pcart/Configure
-        os.path.join(base_pcart_path, 'Copy'),       # ../pcart/Copy
-        os.path.join(base_pcart_path, 'Report')      # ../pcart/Report
-    ]
-    
-def clean_directories():
-    # 获取基础路径
-    base_backend_path = os.path.join(os.path.dirname(__file__), '..')
-    base_pcart_path = os.path.normpath(os.path.join(os.path.dirname(__file__), config['fix_work_dir']))
+    base_pcart_path = os.path.normpath(os.path.join(os.path.dirname(__file__), '..',config['fix_work_dir']))
     
     directories_to_clean = [
         os.path.join(base_backend_path, config['project_base_path']), 
         os.path.join(base_backend_path, config['project_copy_path']),  
         os.path.join(base_backend_path, config['report_base_path']),  
+        os.path.join(base_backend_path, config['env_base_path']),
         os.path.join(base_backend_path, config['project_instrument_path']), 
         os.path.join(base_pcart_path, 'Configure'),  
         os.path.join(base_pcart_path, 'Copy'),       
@@ -178,6 +160,97 @@ def clean_directories():
                         shutil.rmtree(item_path)  
                 except Exception as e:
                     logger.error(f"Error deleting {item_path}: {e}")
-            logger.info(f"Completed cleaning directory: {directory}")
-        else:
-            logger.warning(f"Directory does not exist, skipping cleanup: {directory}")
+            # logger.info(f"Completed cleaning directory: {directory}")
+        # else:
+        #     logger.warning(f"Directory does not exist, skipping cleanup: {directory}")
+
+# 清理对应目录的过期文件
+def clean_old_files(directory, expiry_hours):
+    if not os.path.exists(directory):
+        return
+    
+    current_time = time.time()
+    expiry_seconds = expiry_hours * 3600
+    deleted_count = 0
+    
+    try:
+        for item in os.listdir(directory):
+            item_path = os.path.join(directory, item)
+            try:
+                # 获取文件/目录的最后修改时间
+                mtime = os.path.getmtime(item_path)
+                if current_time - mtime > expiry_seconds:
+                    if os.path.isfile(item_path) or os.path.islink(item_path):
+                        os.unlink(item_path)
+                        deleted_count += 1
+                        logger.info(f"Deleted old file: {item_path}")
+                    elif os.path.isdir(item_path):
+                        shutil.rmtree(item_path)
+                        deleted_count += 1
+                        logger.info(f"Deleted old directory: {item_path}")
+            except Exception as e:
+                logger.error(f"Error deleting {item_path}: {e}")
+        
+        if deleted_count > 0:
+            logger.info(f"Cleaned {deleted_count} old items from {directory}")
+    except Exception as e:
+        logger.error(f"Error scanning directory {directory}: {e}")
+
+# 定期清理目录
+def periodic_cleanup():
+    cleanup_interval = config.get('cleanup_interval_hours', 2)
+    file_expiry = config.get('file_expiry_hours', 3)
+    
+    while True:
+        try:
+            logger.info("Starting periodic cleanup of old files")
+            
+            # 获取基础路径
+            base_backend_path = os.path.join(os.path.dirname(__file__), '..')
+            base_pcart_path = os.path.normpath(os.path.join(os.path.dirname(__file__), "..",config['fix_work_dir']))
+            
+            directories_to_clean = [
+                os.path.join(base_backend_path, config['project_base_path']), 
+                os.path.join(base_backend_path, config['project_copy_path']),  
+                os.path.join(base_backend_path, config['report_base_path']),  
+                os.path.join(base_backend_path, config['env_base_path']),
+                os.path.join(base_backend_path, config['project_instrument_path']), 
+                os.path.join(base_pcart_path, 'Configure'),  
+                os.path.join(base_pcart_path, 'Copy'),       
+                os.path.join(base_pcart_path, 'Report')      
+            ]
+            
+            for directory in directories_to_clean:
+                clean_old_files(directory, file_expiry)
+            
+            logger.info("Periodic cleanup completed")
+            
+            # 等待下一次清理
+            time.sleep(cleanup_interval * 3600)
+            
+        except Exception as e:
+            logger.error(f"Error in periodic cleanup: {e}")
+            time.sleep(300)  
+
+# 启动清理线程
+def start_periodic_cleanup():
+    """启动定期清理线程"""
+    cleanup_thread = threading.Thread(target=periodic_cleanup, daemon=True)
+    cleanup_thread.start()
+    logger.info("Started periodic cleanup thread")
+
+# 初始化conda配置
+def initialize_conda_config():
+    try:
+        CONDA_PATH = get_conda_path()
+
+        subprocess.run([CONDA_PATH, 'config', '--set', 'anaconda_upload', 'no'], 
+                      capture_output=True, text=True)
+        subprocess.run([CONDA_PATH, 'tos', 'accept', '--override-channels', '--channel', 'https://repo.anaconda.com/pkgs/main'], 
+                       capture_output=True, text=True)
+        subprocess.run([CONDA_PATH, 'tos', 'accept', '--override-channels', '--channel', 'https://repo.anaconda.com/pkgs/r'], 
+                       capture_output=True, text=True)
+        
+        logging.info("Conda configuration initialized successfully")
+    except Exception as e:
+        logging.error(f"Failed to initialize conda configuration: {str(e)}")

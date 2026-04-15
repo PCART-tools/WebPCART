@@ -23,17 +23,19 @@ export const getReport = async () => {
     const encodedProjectName = encodeURIComponent(project.value);
     const response = await fetch(`/report/${encodedProjectName}`, {
       method: 'GET',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json'
       }
     });
 
-    if (response.ok) {
-      const result = await response.json();
+    const result = await response.json();
+    
+    if (result.status === 'success') {
       reportData.value = result.data;
       showNotification(`report loaded`, 'success');
     } else {
-      showNotification(`Failed to load report`, 'error');
+      showNotification(result.message, 'error');
     }
   } catch (error) {
     console.error(`Error fetching report:`, error);

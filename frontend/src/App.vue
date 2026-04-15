@@ -3,24 +3,24 @@
         <!-- 功能栏 -->
         <div class="function-bar">
             <b>WebPCART</b>
-            <!-- <div class="function-buttons">
-                <button @click="showInfo('setting')" title="setting">
-                    <i class="fas fa-cog"></i>
-                </button>
-                <button @click="showInfo('help')" title="help">
+            <div class="function-buttons">
+                <button @click="showHelpModal" title="help">
                     <i class="fas fa-question-circle"></i>
+                </button>
+                <!-- <button @click="showInfo('setting')" title="setting">
+                    <i class="fas fa-cog"></i>
                 </button>
                 <button @click="showInfo('about')" title="about">
                     <i class="fas fa-info-circle"></i>
-                </button>
-            </div> -->
+                </button> -->
+            </div>
         </div>
 
         <!-- 网页主体 -->
         <div class="app-main">
             <!-- 项目管理栏（含运行结果） -->
             <div class="app-project">
-                <div class="project-nav">
+                <!-- <div class="project-nav">
                     <button
                         class="nav-button"
                         :class="{active: projectView === 'project'}"
@@ -31,9 +31,9 @@
                         :class="{active: projectView === 'detail'}"
                         @click="projectView = 'detail'"
                     >Details</button>
-                </div>
+                </div> -->
 
-                <div v-show="projectView === 'project'" class="project-content">
+                <div class="project-content">
                     <div class="project-title">
                         <b>Projects</b>
                         <button @click="selectFolder" title="import" class="import-button">
@@ -76,7 +76,7 @@
                     </div> 
                 </div>
 
-                <div v-show="projectView === 'detail'" class="detail-content">
+                <!-- <div v-show="projectView === 'detail'" class="detail-content">
                     <div v-if="fixCompleted" class="detail-buttons">
                         <button @click="getReport" class="detail-button">Report</button>
                     </div>
@@ -84,18 +84,18 @@
                     <div v-else>
                         <b>Run fix command to get results</b>
                     </div>       
-                </div>               
+                </div>                -->
             </div>
 
             <div class="app-code">
                 <!-- 代码编辑栏 -->
-                <div v-show="projectView === 'project' && currentFilePath" class="editor-container" ref="editorRef" :class="{disabled: !currentFilePath}"></div>
-                <div v-show="projectView === 'project' && !currentFilePath" class="editor-placeholder">
+                <div v-show="!fixCompleted || (fixCompleted && currentFilePath)" class="editor-container" ref="editorRef" :class="{disabled: !currentFilePath}"></div>
+                <div v-show="!fixCompleted && !currentFilePath" class="editor-placeholder">
                     <b>choose a file(.py / .txt) to edit</b>
                 </div>
 
                 <!-- 结果展示栏 -->
-                <div v-show="projectView === 'detail'" class="detail-view-container">
+                <div v-show="fixCompleted && !currentFilePath" class="detail-view-container">
                     <div v-if="reportData" class="report-content">
                         <div class="report-header">
                             <h3>Compatibility Report</h3>
@@ -195,6 +195,12 @@
                         <b>Select a command to view details</b>
                     </div>
                 </div>
+
+                <div v-show="fixLog" class="fix-log-container">
+                    <div class="log-content" ref="logContentRef">
+                        <pre class="log-text">{{ fixLog }}</pre>
+                    </div>
+                </div>
             </div>
 
             <!-- 配置栏 -->
@@ -205,13 +211,13 @@
                         <b>Import Virtual Environment</b>
                         <div class="env-section">
                             <button class="env-display-button" :class="{'env-ready': currentEnv.path}" @click="openEnvDetailsModal('current')">
-                                <b>currentEnv</b>
+                                <b>Current Env</b>
                             </button>
                             <button class="env-add-button" @click="openImportEnvModal('current')">import</button>
                         </div>
                         <div class="env-section">
                             <button class="env-display-button" :class="{'env-ready': targetEnv.path}" @click="openEnvDetailsModal('target')">
-                                <b>targetEnv</b>
+                                <b>Target Env</b>
                             </button>
                             <button class="env-add-button" @click="openImportEnvModal('target')">import</button>
                         </div>
@@ -219,7 +225,7 @@
 
                 <!-- 修复库配置栏 -->
                 <div class="app-target">
-                    <b>Libraries to Fix</b>
+                    <b>Library to Fix</b>
                     <select class="target-select"
                             @change="handleLibrarySelect"
                             v-model="handleSelectedLibrary"
@@ -273,15 +279,15 @@
                     <div class="progress-percentage">{{ fixProgress }}%</div>
                 </div>
 
-                <div v-if="fixError" class="error-message">
-                    {{ fixError }}
-                </div>
+                <button v-if="fixCompleted" class="run-button" @click="showReport">
+                    Report
+                </button>
             </div>
         </div>
     </div>
 
     <!-- 环境导入窗口 -->
-    <EnvironmentImportModal
+        <EnvironmentImportModal
         :show-import-modal="showImportModal"
         :selected-env-type="selectedEnvType"
         :import-env-method="importEnvMethod"
@@ -300,6 +306,8 @@
         @handle-requirement-select="handleRequirementSelect"
         @handle-condapack-select="handleCondapackSelect"
         @create-environment="createEnvironment"
+        @update:import-env-method="importEnvMethod = $event"
+        @update:python-version="pythonVersion = $event"
     />
 
     <!-- 虚拟环境详情窗口 -->
@@ -324,6 +332,11 @@
     :show="showAPIDetailModal" 
     :api-detail="selectedAPIDetail" 
     @close="closeAPIDetailModal"
+    />
+
+    <HelpModal
+    :show="showHelp"
+    @close="closeHelpModal"
     />
 </template>
 
@@ -404,11 +417,18 @@ import {
     isRunningFix,
     fixProgressStep,
     fixProgress,
-    fixError,
+    fixLog,
     getSelectedLibraryInfo,
     runFixCommand
 } from './composables/fixManager'
 
+import {
+    showHelp,
+    showHelpModal,
+    closeHelpModal
+} from './composables/toolManager'
+
+import HelpModal from './components/HelpModal.vue'
 import CommandSelectionModal from './components/RunCommandModal.vue';
 import APIDetailModal from './components/APIDetailModal.vue';
 import EnvironmentImportModal from './components/EnvironmentImportModal.vue';
@@ -416,12 +436,17 @@ import EnvironmentDetailsModal from './components/EnvironmentDetailsModal.vue';
 import { showNotification } from './composables/utils';
 
 // 项目视图状态
-const projectView = ref('project')
+// const projectView = ref('project')
 
 // 编辑器相关
 const editorRef = ref(null)
 let editor = null
 let handleKeyDown = null
+
+const showReport = () => {
+    currentFilePath.value = null;
+    getReport();
+}
 
 const handleSelectedLibrary = computed({
     get(){
