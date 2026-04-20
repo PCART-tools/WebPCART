@@ -35,8 +35,8 @@ const targetEnv = ref({
 const configChanged = ref(true)
 
 // 分片上传配置
-const CHUNK_SIZE = 50 * 1024 * 1024
-const UPLOAD_CONCURRENCY = 3;
+const CHUNK_SIZE = 100 * 1024 * 1024
+const UPLOAD_CONCURRENCY = 5;
 
 // 打开导入环境窗口
 export const openImportEnvModal = (envType) => {
@@ -167,7 +167,7 @@ async function uploadFileInChunks(file, envType, onProgress) {
             
             onProgress?.({
                 progress: Math.min(progress, 60),
-                step: `Uploading chunks (${uploadedChunks}/${totalChunks})`,
+                step: `Uploading (${uploadedChunks}/${totalChunks})`,
                 message: `上传中: ${uploadedMB.toFixed(1)}MB / ${totalMB.toFixed(1)}MB`
             });
             

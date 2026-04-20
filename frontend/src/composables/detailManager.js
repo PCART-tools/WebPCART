@@ -5,6 +5,8 @@ import { showNotification } from './utils'
 // 报告相关状态
 const reportData = ref(null)
 const isGeneratingReport = ref(false)
+const logContent = ref(null)
+const logFilename = ref(null)
 
 // API详情模态框相关状态
 const showAPIDetailModal = ref(false);
@@ -33,6 +35,16 @@ export const getReport = async () => {
     
     if (result.status === 'success') {
       reportData.value = result.data;
+      
+      // 如果存在log内容,保存它
+      if (result.log_content) {
+        logContent.value = result.log_content;
+        logFilename.value = result.log_filename;
+      } else {
+        logContent.value = null;
+        logFilename.value = null;
+      }
+      
       showNotification(`report loaded`, 'success');
     } else {
       showNotification(result.message, 'error');
@@ -62,5 +74,7 @@ export {
   showAPIDetail,
   selectedAPIDetail,
   closeAPIDetailModal,
-  showAPIDetailModal
+  showAPIDetailModal,
+  logContent,
+  logFilename
 }
