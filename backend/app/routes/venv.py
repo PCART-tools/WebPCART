@@ -101,7 +101,6 @@ def init_upload():
 
         return jsonify({
             'uploadSessionId': upload_session_id,
-            'chunkSize': 50 * 1024 * 1024,
             'message': 'Upload session created'
         })
     except Exception as e:
@@ -135,7 +134,7 @@ def upload_chunk():
                     'progress': progress
                 })
             
-            # 保存分片文件 - 直接从流中读取二进制数据
+            # 保存分片文件
             chunk_path = os.path.join(session['temp_dir'], f'chunk_{chunk_index:06d}')
             chunk_data = chunk_file.stream.read()
             with open(chunk_path, 'wb') as f:
@@ -207,7 +206,6 @@ def complete_upload():
                 expected_size = session['file_size']
                 actual_size = os.path.getsize(merged_path)
                 if actual_size != expected_size:
-                    # 添加调试日志
                     logger.error(f"File size mismatch: expected {expected_size}, got {actual_size}, difference: {actual_size - expected_size}")
                     yield f"data: {json.dumps({'status':'error', 'message': f'File size mismatch: expected {expected_size}, got {actual_size} (diff: {actual_size - expected_size})', 'type':env_type})}\n\n"
                     return

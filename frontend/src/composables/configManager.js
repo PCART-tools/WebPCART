@@ -36,7 +36,7 @@ const configChanged = ref(true)
 
 // 分片上传配置
 const CHUNK_SIZE = 100 * 1024 * 1024
-const UPLOAD_CONCURRENCY = 5;
+const UPLOAD_CONCURRENCY = 1;
 
 // 打开导入环境窗口
 export const openImportEnvModal = (envType) => {
@@ -431,7 +431,7 @@ export const createEnvironment = async() => {
     }catch(error){
         setError(error.message);
         console.error('Error creating environment:', error);
-        showNotification(`Failed to create ${selectedEnvType.value} environment: ${error.message}`, 'error');
+        showNotification(`Failed to create ${selectedEnvType.value} environment`);
     }
 }
 
