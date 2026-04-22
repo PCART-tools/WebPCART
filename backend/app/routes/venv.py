@@ -9,7 +9,9 @@ import logging
 import re
 import time
 import threading
-from ..common import get_logger, get_env_base_path, get_conda_path, get_user_id
+import pickle
+from pathlib import Path
+from ..common import get_logger, get_env_base_path, get_conda_path, get_user_id, get_upload_sessions_path
 
 logger = get_logger('venv')
 
@@ -18,8 +20,54 @@ venv_bp = Blueprint('venv', __name__)
 _user_locks = {}
 _locks_mutex = threading.Lock()
 
-_upload_sessions = {}
-_sessions_lock = threading.Lock()
+# 使用文件系统存储会话，支持多进程
+SESSIONS_DIR = get_upload_sessions_path()
+
+# 会话超时时间（秒）
+SESSION_TIMEOUT = 3600  # 1小时
+# 完成/失败会话保留时间（秒）
+RETAIN_TIME_AFTER_FINISH = 300  # 5分钟
+
+def get_session_file(session_id):
+    return os.path.join(SESSIONS_DIR, f"{session_id}.pkl")
+
+def load_session(session_id):
+    session_file = get_session_file(session_id)
+    if not os.path.exists(session_file):
+        return None
+    try:
+        with open(session_file, 'rb') as f:
+            return pickle.load(f)
+    except Exception as e:
+        logger.error(f"Failed to load session {session_id}: {e}")
+        return None
+
+def save_session(session_id, session_data):
+    session_file = get_session_file(session_id)
+    try:
+        with open(session_file, 'wb') as f:
+            pickle.dump(session_data, f)
+    except Exception as e:
+        logger.error(f"Failed to save session {session_id}: {e}")
+
+def delete_session(session_id):
+    session_file = get_session_file(session_id)
+    try:
+        if os.path.exists(session_file):
+            os.remove(session_file)
+    except Exception as e:
+        logger.error(f"Failed to delete session file {session_id}: {e}")
+
+def list_active_sessions():
+    sessions = []
+    try:
+        for filename in os.listdir(SESSIONS_DIR):
+            if filename.endswith('.pkl'):
+                session_id = filename[:-4]
+                sessions.append(session_id)
+    except Exception as e:
+        logger.error(f"Failed to list sessions: {e}")
+    return sessions
 
 def get_user_lock(user_id):
     with _locks_mutex:
@@ -85,17 +133,19 @@ def init_upload():
 
         temp_dir = tempfile.mkdtemp(prefix=f'upload_{upload_session_id}_')
 
-        with _sessions_lock:
-            _upload_sessions[upload_session_id] = {
-                'user_id': user_id,
-                'filename': filename,
-                'file_size': file_size,
-                'total_chunks': total_chunks,
-                'env_type': env_type,
-                'temp_dir': temp_dir,
-                'uploaded_chunks': set(),
-                'created_at': time.time()
-            }
+        session_data = {
+            'user_id': user_id,
+            'filename': filename,
+            'file_size': file_size,
+            'total_chunks': total_chunks,
+            'env_type': env_type,
+            'temp_dir': temp_dir,
+            'uploaded_chunks': set(),
+            'created_at': time.time(),
+            'status': 'uploading'
+        }
+        
+        save_session(upload_session_id, session_data)
 
         logger.info(f'Upload session initialized: {upload_session_id}')
 
@@ -106,7 +156,7 @@ def init_upload():
     except Exception as e:
         logger.error(f'Failed to initialize upload: {str(e)}')
         return jsonify({'error': str(e)}), 500
-    
+
 # 上传分片
 @venv_bp.route('/venv/upload_chunk', methods=['POST'])
 def upload_chunk():
@@ -117,32 +167,46 @@ def upload_chunk():
         chunk_file = request.files['chunk']
         
         if not upload_session_id or chunk_index is None:
+            logger.error(f"Missing required fields: uploadSessionId={upload_session_id}, chunkIndex={chunk_index}")
             return jsonify({'error': 'Missing required fields'}), 400
         
-        with _sessions_lock:
-            if upload_session_id not in _upload_sessions:
-                return jsonify({'error': 'Invalid upload session'}), 404
-            
-            session = _upload_sessions[upload_session_id]
-            
-            # 检查是否已上传
-            if chunk_index in session['uploaded_chunks']:
-                progress = len(session['uploaded_chunks']) / session['total_chunks'] * 100
-                return jsonify({
-                    'message': 'Chunk already uploaded',
-                    'chunkIndex': chunk_index,
-                    'progress': progress
-                })
-            
-            # 保存分片文件
-            chunk_path = os.path.join(session['temp_dir'], f'chunk_{chunk_index:06d}')
-            chunk_data = chunk_file.stream.read()
-            with open(chunk_path, 'wb') as f:
-                f.write(chunk_data)
-            
-            session['uploaded_chunks'].add(chunk_index)
+        session = load_session(upload_session_id)
+        if session is None:
+            logger.error(f"Upload session not found: {upload_session_id}")
+            return jsonify({'error': 'Invalid upload session'}), 404
+        
+        logger.info(f"Found session for {upload_session_id}: user_id={session.get('user_id')}, created_at={session.get('created_at')}, uploaded_chunks={len(session.get('uploaded_chunks', set()))}")
+        
+        # 检查会话是否已过期
+        if (time.time() - session['created_at']) > SESSION_TIMEOUT:
+            delete_session(upload_session_id)
+            logger.error(f"Upload session expired: {upload_session_id}")
+            return jsonify({'error': 'Upload session expired'}), 404
+        
+        # 检查是否已上传
+        if chunk_index in session['uploaded_chunks']:
             progress = len(session['uploaded_chunks']) / session['total_chunks'] * 100
-            uploaded_chunks_count = len(session['uploaded_chunks'])
+            logger.info(f"Chunk {chunk_index} already uploaded for session {upload_session_id}")
+            return jsonify({
+                'message': 'Chunk already uploaded',
+                'chunkIndex': chunk_index,
+                'progress': progress
+            })
+        
+        # 保存分片文件
+        chunk_path = os.path.join(session['temp_dir'], f'chunk_{chunk_index:06d}')
+        logger.info(f"Saving chunk {chunk_index} to {chunk_path}")
+        chunk_data = chunk_file.stream.read()
+        with open(chunk_path, 'wb') as f:
+            f.write(chunk_data)
+        
+        session['uploaded_chunks'].add(chunk_index)
+        progress = len(session['uploaded_chunks']) / session['total_chunks'] * 100
+        uploaded_chunks_count = len(session['uploaded_chunks'])
+        logger.info(f"Chunk {chunk_index} uploaded successfully for session {upload_session_id}, progress: {progress:.2f}%")
+        
+        # 保存更新后的会话
+        save_session(upload_session_id, session)
         
         return jsonify({
             'message': 'Chunk uploaded successfully',
@@ -153,9 +217,9 @@ def upload_chunk():
         })
     
     except Exception as e:
-        logger.error(f"Failed to upload chunk: {str(e)}")
+        logger.error(f"Failed to upload chunk: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
-    
+
 # 完成分片上传并合并
 @venv_bp.route('/venv/complete_upload', methods=['POST'])
 def complete_upload():
@@ -165,24 +229,36 @@ def complete_upload():
         env_type = data.get('envType')
         
         if not upload_session_id:
+            logger.error("Missing upload session ID in complete_upload request")
             return jsonify({'error': 'Missing upload session ID'}), 400
         
-        with _sessions_lock:
-            if upload_session_id not in _upload_sessions:
-                return jsonify({'error': 'Invalid upload session'}), 404
-            
-            session = _upload_sessions[upload_session_id]
-            
-            # 验证所有分片都已上传
-            if len(session['uploaded_chunks']) != session['total_chunks']:
-                missing = set(range(session['total_chunks'])) - session['uploaded_chunks']
-                return jsonify({
-                    'error': 'Incomplete upload',
-                    'missingChunks': list(missing)
-                }), 400
-            
-            temp_dir = session['temp_dir']
-            total_chunks = session['total_chunks']
+        session = load_session(upload_session_id)
+        if session is None:
+            logger.error(f"Upload session not found in complete_upload: {upload_session_id}")
+            return jsonify({'error': 'Invalid upload session'}), 404
+        
+        logger.info(f"Completing session {upload_session_id}: user_id={session.get('user_id')}, total_chunks={session.get('total_chunks')}, uploaded_chunks={len(session.get('uploaded_chunks', set()))}")
+        
+        # 检查会话是否已过期
+        if (time.time() - session['created_at']) > SESSION_TIMEOUT:
+            delete_session(upload_session_id)
+            logger.error(f"Upload session expired in complete_upload: {upload_session_id}")
+            return jsonify({'error': 'Upload session expired'}), 404
+        
+        # 验证所有分片都已上传
+        if len(session['uploaded_chunks']) != session['total_chunks']:
+            missing = set(range(session['total_chunks'])) - session['uploaded_chunks']
+            logger.error(f"Incomplete upload for session {upload_session_id}: missing chunks {list(missing)}")
+            return jsonify({
+                'error': 'Incomplete upload',
+                'missingChunks': list(missing)
+            }), 400
+        
+        temp_dir = session['temp_dir']
+        total_chunks = session['total_chunks']
+        
+        session['status'] = 'processing'
+        save_session(upload_session_id, session)
         
         ENV_BASE_PATH, CONDA_PATH = get_config()
         env_path = os.path.join(ENV_BASE_PATH, env_type)
@@ -194,6 +270,7 @@ def complete_upload():
                 
                 # 合并分片文件
                 merged_path = os.path.join(temp_dir, 'merged.tar.gz')
+                logger.info(f"Merging {total_chunks} chunks into {merged_path}")
                 with open(merged_path, 'wb') as outfile:
                     for i in range(total_chunks):
                         chunk_path = os.path.join(temp_dir, f'chunk_{i:06d}')
@@ -222,12 +299,13 @@ def complete_upload():
                 
                 result = subprocess.run(
                     ['tar', '-xzf', merged_path, '-C', env_path],
-                    capture_output=True, 
+                    capture_output=True,
                     text=True,
                     timeout=600
                 )
                 
                 if result.returncode != 0:
+                    logger.error(f"Failed to extract conda pack: {result.stderr}")
                     yield f"data: {json.dumps({'status':'error', 'message': f'Failed to extract: {result.stderr}', 'type':env_type})}\n\n"
                     return
                 
@@ -236,9 +314,10 @@ def complete_upload():
                 shutil.rmtree(temp_dir, ignore_errors=True)
                 session_cleaned = True
                 
-                with _sessions_lock:
-                    if upload_session_id in _upload_sessions:
-                        del _upload_sessions[upload_session_id]
+                # 更新会话状态
+                session['status'] = 'completed'
+                session['finished_at'] = time.time()
+                save_session(upload_session_id, session)
                 
                 # 获取环境信息
                 dependencies = get_packages(env_path, CONDA_PATH)
@@ -254,25 +333,34 @@ def complete_upload():
                     'type': env_type
                 }
                 yield f"data: {json.dumps(result_data)}\n\n"
+                logger.info(f"Upload completed successfully for session {upload_session_id}")
                 
             except Exception as e:
-                logger.error(f"Failed to complete upload: {str(e)}")
+                logger.error(f"Failed to complete upload: {str(e)}", exc_info=True)
                 yield f"data: {json.dumps({'status':'error', 'message': f'Exception: {str(e)}', 'type':env_type})}\n\n"
+                # 标记会话为失败
+                session['status'] = 'failed'
+                session['error'] = str(e)
+                session['finished_at'] = time.time()
+                save_session(upload_session_id, session)
             finally:
                 # 确保清理临时目录
                 if not session_cleaned:
-                    with _sessions_lock:
-                        if upload_session_id in _upload_sessions:
-                            session_data = _upload_sessions[upload_session_id]
-                            shutil.rmtree(session_data['temp_dir'], ignore_errors=True)
-                            del _upload_sessions[upload_session_id]
+                    shutil.rmtree(temp_dir, ignore_errors=True)
         
         return Response(generate_progress(), mimetype='text/event-stream')
     
     except Exception as e:
-        logger.error(f"Failed to complete upload: {str(e)}")
+        logger.error(f"Failed to complete upload: {str(e)}", exc_info=True)
+        # 标记会话为失败
+        session = load_session(upload_session_id)
+        if session:
+            session['status'] = 'failed'
+            session['error'] = str(e)
+            session['finished_at'] = time.time()
+            save_session(upload_session_id, session)
         return jsonify({'error': str(e)}), 500
-    
+
 # 取消上传会话
 @venv_bp.route('/venv/cancel_upload', methods=['POST'])
 def cancel_upload():
@@ -283,18 +371,25 @@ def cancel_upload():
         if not upload_session_id:
             return jsonify({'error': 'Missing upload session ID'}), 400
         
-        with _sessions_lock:
-            if upload_session_id in _upload_sessions:
-                session = _upload_sessions[upload_session_id]
-                shutil.rmtree(session['temp_dir'], ignore_errors=True)
-                del _upload_sessions[upload_session_id]
-                logger.info(f"Upload session cancelled: {upload_session_id}")
-                return jsonify({'message': 'Upload cancelled'})
-            else:
-                return jsonify({'error': 'Invalid upload session'}), 404
-    
+        session = load_session(upload_session_id)
+        if session is None:
+            return jsonify({'error': 'Invalid upload session'}), 404
+        
+        # 清理临时文件
+        temp_dir = session.get('temp_dir')
+        if temp_dir and os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir, ignore_errors=True)
+        
+        # 标记会话为已取消
+        session['status'] = 'cancelled'
+        session['finished_at'] = time.time()
+        save_session(upload_session_id, session)
+        
+        logger.info(f"Upload session cancelled: {upload_session_id}")
+        
+        return jsonify({'message': 'Upload cancelled'})
     except Exception as e:
-        logger.error(f"Failed to cancel upload: {str(e)}")
+        logger.error(f'Failed to cancel upload: {str(e)}')
         return jsonify({'error': str(e)}), 500
 
 def get_python_version(env_path, conda_path):

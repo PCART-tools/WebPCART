@@ -6,6 +6,7 @@
   "project_copy_path": "./data/projects_copy",
   "report_base_path": "./data/reports",
   "project_instrument_path": "./data/projects_instrument",
+  "upload_sessions_path": "./data/upload_sessions",
   "fix_work_dir": "../pcart",
   "cleanup_interval_hours": 2,
   "file_expiry_hours": 3

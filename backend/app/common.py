@@ -6,6 +6,7 @@ from flask import g, session, request
 import threading
 import time
 import subprocess
+import pickle
 
 # 设置日志配置
 logging.basicConfig(level=logging.INFO)
@@ -83,6 +84,14 @@ def get_instrument_base_path():
         os.makedirs(user_instrument_path, exist_ok=True)
     return user_instrument_path
 
+def get_upload_sessions_path():
+    base_path = os.path.normpath(
+        os.path.join(os.path.dirname(__file__), '..', config['upload_sessions_path'])
+    )
+    if not os.path.exists(base_path):
+        os.makedirs(base_path, exist_ok=True)
+    return base_path
+
 def get_work_dir():
     return os.path.normpath(
         os.path.join(os.path.dirname(__file__), '..', config['fix_work_dir'])
@@ -143,6 +152,7 @@ def clean_directories():
         os.path.join(base_backend_path, config['report_base_path']),  
         os.path.join(base_backend_path, config['env_base_path']),
         os.path.join(base_backend_path, config['project_instrument_path']), 
+        os.path.join(base_backend_path, config['upload_sessions_path']),
         os.path.join(base_pcart_path, 'Configure'),  
         os.path.join(base_pcart_path, 'Copy'),       
         os.path.join(base_pcart_path, 'Report')      
@@ -196,6 +206,94 @@ def clean_old_files(directory, expiry_hours):
     except Exception as e:
         logger.error(f"Error scanning directory {directory}: {e}")
 
+# 清理过期的上传会话
+def cleanup_expired_upload_sessions():
+    sessions_dir = get_upload_sessions_path()
+    if not os.path.exists(sessions_dir):
+        return
+        
+    now = time.time()
+    SESSION_TIMEOUT = 3600  
+    RETAIN_TIME_AFTER_FINISH = 300  
+    
+    expired_ids = []
+    active_sessions = []
+    
+    try:
+        for filename in os.listdir(sessions_dir):
+            if filename.endswith('.pkl'):
+                session_id = filename[:-4]
+                active_sessions.append(session_id)
+    except Exception as e:
+        logger.error(f"Failed to list sessions: {e}")
+        return
+    
+    logger.info(f"Starting upload session cleanup. Current time: {now:.2f}, Active sessions: {active_sessions}")
+    
+    for sid in active_sessions:
+        session_file = os.path.join(sessions_dir, f"{sid}.pkl")
+        if not os.path.exists(session_file):
+            expired_ids.append(sid)
+            continue
+            
+        try:
+            with open(session_file, 'rb') as f:
+                session_info = pickle.load(f)
+        except Exception as e:
+            logger.error(f"Failed to load session {sid}: {e}")
+            expired_ids.append(sid)
+            continue
+            
+        session_age = now - session_info['created_at']
+        status = session_info.get('status', 'uploading')
+        finished_at = session_info.get('finished_at', session_info['created_at'])
+        time_since_finish = now - finished_at
+        
+        logger.info(f"Checking session {sid}: age={session_age:.2f}s, status={status}, time_since_finish={time_since_finish:.2f}s")
+        
+        # 跳过正在上传的会话
+        if 'status' not in session_info or session_info.get('status') == 'uploading':
+            if session_age > SESSION_TIMEOUT:
+                expired_ids.append(sid)
+                logger.info(f"Marking uploading session {sid} for cleanup (age {session_age:.2f}s > timeout {SESSION_TIMEOUT}s)")
+            else:
+                logger.info(f"Keeping uploading session {sid} (age {session_age:.2f}s <= timeout {SESSION_TIMEOUT}s)")
+        # 清理失效的会话
+        elif session_info.get('status') in ['completed', 'failed', 'cancelled']:
+            if time_since_finish > RETAIN_TIME_AFTER_FINISH:
+                expired_ids.append(sid)
+                logger.info(f"Marking finished session {sid} for cleanup (time since finish {time_since_finish:.2f}s > retain time {RETAIN_TIME_AFTER_FINISH}s)")
+            else:
+                logger.info(f"Keeping finished session {sid} (time since finish {time_since_finish:.2f}s <= retain time {RETAIN_TIME_AFTER_FINISH}s)")
+    
+    if expired_ids:
+        logger.info(f"Cleaning up {len(expired_ids)} expired sessions: {expired_ids}")
+        for sid in expired_ids:
+            # 清理临时文件
+            session_file = os.path.join(sessions_dir, f"{sid}.pkl")
+            try:
+                with open(session_file, 'rb') as f:
+                    session_info = pickle.load(f)
+                temp_dir = session_info.get('temp_dir')
+                if temp_dir and os.path.exists(temp_dir):
+                    try:
+                        shutil.rmtree(temp_dir, ignore_errors=True)
+                        logger.info(f"Removed temp directory for session {sid}: {temp_dir}")
+                    except Exception as e:
+                        logger.error(f"Failed to remove temp dir {temp_dir}: {e}")
+            except Exception as e:
+                logger.error(f"Failed to load session info for cleanup {sid}: {e}")
+            
+            # 删除会话文件
+            try:
+                if os.path.exists(session_file):
+                    os.remove(session_file)
+                    logger.info(f"Cleaned up expired upload session: {sid}")
+            except Exception as e:
+                logger.error(f"Failed to delete session file {sid}: {e}")
+    else:
+        logger.info("No upload sessions to clean up")
+
 # 定期清理目录
 def periodic_cleanup():
     cleanup_interval = config.get('cleanup_interval_hours', 2)
@@ -215,6 +313,7 @@ def periodic_cleanup():
                 os.path.join(base_backend_path, config['report_base_path']),  
                 os.path.join(base_backend_path, config['env_base_path']),
                 os.path.join(base_backend_path, config['project_instrument_path']), 
+                os.path.join(base_backend_path, config['upload_sessions_path']),
                 os.path.join(base_pcart_path, 'Configure'),  
                 os.path.join(base_pcart_path, 'Copy'),       
                 os.path.join(base_pcart_path, 'Report')      
@@ -222,6 +321,9 @@ def periodic_cleanup():
             
             for directory in directories_to_clean:
                 clean_old_files(directory, file_expiry)
+            
+            # 清理过期的上传会话
+            cleanup_expired_upload_sessions()
             
             logger.info("Periodic cleanup completed")
             
@@ -234,7 +336,6 @@ def periodic_cleanup():
 
 # 启动清理线程
 def start_periodic_cleanup():
-    """启动定期清理线程"""
     cleanup_thread = threading.Thread(target=periodic_cleanup, daemon=True)
     cleanup_thread.start()
     logger.info("Started periodic cleanup thread")
