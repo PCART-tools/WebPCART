@@ -10,13 +10,14 @@ PCART project address: https://github.com/PCART-tools/PCART
 ## Technology Stack
 
 - **Frontend**: 
-  - Vue.js 3
+  - Vue.js 3.5.25
 - **Backend**: 
   - Python 3.9+
-  - Flask
+  - Flask 3.1.2
+  - Flask-CORS 5.0.0
 - **Build Tools**: 
-  - Vite
-  - npm
+  - Vite 7.2.4
+  - npm (Node.js v22.12.0+)
 - **Development Tools**: 
   - Git
 
