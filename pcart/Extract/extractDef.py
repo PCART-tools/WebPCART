@@ -1,0 +1,108 @@
+## @package extractDef
+#  Provide some class definitions for extracting lib API definitions from lib source files
+#
+#  More details (TODO)
+
+
+ 
+import ast
+
+
+
+## Function definition node visitor
+## 函数定义节点遍历器
+#
+#  Inherits from ast.NodeVisitor 
+class FunctionDefVisitor(ast.NodeVisitor):
+    def __init__(self):
+        self._defNodes=[]
+    
+    def functionNodes(self):
+        return self._defNodes
+
+    def visit_FunctionDef(self, node):
+        self._defNodes.append(node)
+
+
+
+## From import statement node visitor
+## From import语句节点遍历器
+#
+#  Inherits from ast.NodeVisitor 
+class FromImport(ast.NodeVisitor):
+    def __init__(self, currentLevel):
+        self._importDict={}
+        self._currentLevel=currentLevel
+
+    @property
+    def importDict(self):
+        return self._importDict
+
+    def visit_ImportFrom(self, node):
+        if node.module is not None:
+            module=node.module
+            if node.level==0:#若是绝对导入，需考虑层级
+                tempLst=module.split('.')
+                if len(tempLst)==1:
+                    module=''
+                elif self._currentLevel in tempLst:
+                    index=tempLst.index(self._currentLevel)
+                    module='.'.join(tempLst[index+1:])
+            
+            lst=[{'name':name.name,'alias':name.asname} for name in node.names] #可能会import个多个,from A import a,b,c 
+            for dic in lst: #lst中每个元素都是字典
+                key=module+'.'+dic['name'] #dic['name']可能是*
+                key=key.lstrip('.')
+                if dic['alias']:
+                    self._importDict[key]=dic['alias']
+                else:
+                    self._importDict[key]=dic['name']
+
+
+
+## Get prefix and relative path of a source file
+## 获取源码文件路径前缀和相对路径
+#
+#  The prefix denotes the fully qualified name of a source file. For example, the prefix for lib/a/b/c.py is lib.a.b.c.
+#  the relative path denotes the relative path of a source file, e.g., lib/a/b/c.py   
+class Def2format:
+    def __init__(self):
+        self._prefix=''
+        self._relativePath='' #记录包的相对路径，例如numpy/core/func.py
+    
+    @property
+    def prefix(self):
+        return self._prefix
+    
+    @property
+    def relativePath(self):
+        return self._relativePath
+    
+    # Get the relative path and prefix of a source file 
+    def toFormat(self,filePath):
+        s=filePath.split(f"site-packages/")[-1]
+        self._relativePath=s
+        s=s.replace('/','.')
+        pos=s.rfind('.')
+        s=s[0:pos]
+        self._prefix=s.replace('/', '.')
+
+
+
+## Get all assign nodes from a lib source file 
+## 源码Assign节点遍历器
+#
+#  For an assign node, extract the values before (the variable name) and after (the value expression) the assignment operator 
+#  对于Assign节点，只需要关注等号左右两边的名字   
+class AssignVisitor(ast.NodeVisitor):
+    def __init__(self):
+        self._targetCall={}
+    
+    def get_target_call(self):
+        return self._targetCall
+    
+    def visit_Assign(self,node):
+        if isinstance(node.value,ast.Call):
+            targetName=ast.unparse(node.targets)
+            valueExpr=ast.unparse(node.value)
+            self._targetCall[targetName]=valueExpr
