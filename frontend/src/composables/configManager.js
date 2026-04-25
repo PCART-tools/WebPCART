@@ -1,6 +1,7 @@
 import { computed, ref, reactive } from 'vue'
 import { showNotification } from './utils'
 import { resetFixState } from './fixManager'
+import apiConfig from '../../config/apiconfig.js'
 
 // 虚拟环境相关状态
 const showImportModal = ref(false)
@@ -35,8 +36,8 @@ const targetEnv = ref({
 const configChanged = ref(true)
 
 // 分片上传配置
-const CHUNK_SIZE = 50 * 1024 * 1024
-const UPLOAD_CONCURRENCY = 3;
+const CHUNK_SIZE = 128 * 1024 * 1024
+const UPLOAD_CONCURRENCY = 1;
 
 // 打开导入环境窗口
 export const openImportEnvModal = (envType) => {
@@ -81,7 +82,10 @@ export const handleCondapackSelect = (e) => {
 
 // 初始化上传会话
 async function initUploadSession(filename, fileSize, totalChunks, envType) {
-    const response = await fetch('/venv/init_upload', {
+    const url = `${apiConfig.BASE_URL}/venv/init_upload`;
+    console.log('Initializing upload session:', { filename, fileSize, totalChunks, envType, url });
+    
+    const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -94,45 +98,99 @@ async function initUploadSession(filename, fileSize, totalChunks, envType) {
     });
     
     if (!response.ok) {
+        console.error('Failed to initialize upload session:', response.status, response.statusText);
         throw new Error(`Failed to initialize upload: ${response.statusText}`);
     }
     
-    return await response.json();
+    const result = await response.json();
+    console.log('Upload session initialized successfully:', result);
+    return result;
 }
 
 // 上传单个分片
 async function uploadChunk(chunk, uploadSessionId, chunkIndex, totalChunks) {
+    const url = `${apiConfig.BASE_URL}/venv/upload_chunk`;
+    console.log('Uploading chunk:', { uploadSessionId, chunkIndex, totalChunks, url, chunkSize: chunk.size });
+    
     const formData = new FormData();
     formData.append('chunk', chunk, `chunk_${chunkIndex}`);
     formData.append('uploadSessionId', uploadSessionId);
     formData.append('chunkIndex', chunkIndex.toString());
     formData.append('totalChunks', totalChunks.toString());
     
-    const response = await fetch('/venv/upload_chunk', {
+    const response = await fetch(url, {
         method: 'POST',
         credentials: 'include',
         body: formData
     });
     
     if (!response.ok) {
+        console.error('Failed to upload chunk:', chunkIndex, response.status, response.statusText);
         throw new Error(`Chunk ${chunkIndex} upload failed: ${response.statusText}`);
     }
     
-    return await response.json();
+    const result = await response.json();
+    console.log('Chunk uploaded successfully:', chunkIndex, result);
+    return result;
 }
 
 // 取消上传会话
 async function cancelUploadSession(uploadSessionId) {
     try {
-        await fetch('/venv/cancel_upload', {
+        const url = `${apiConfig.BASE_URL}/venv/cancel_upload`;
+        console.log('Cancelling upload session:', { uploadSessionId, url });
+        
+        await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify({ uploadSessionId })
         });
+        console.log('Upload session cancelled successfully:', uploadSessionId);
     } catch (error) {
         console.error('Failed to cancel upload:', error);
     }
+}
+
+// 完成分片上传
+async function completeUpload(uploadSessionId, envType, onProgress) {
+    const url = `${apiConfig.BASE_URL}/venv/complete_upload`;
+    console.log('Completing upload:', { uploadSessionId, envType, url });
+    
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ uploadSessionId, envType })
+    });
+    
+    if (!response.ok) {
+        console.error('Failed to complete upload:', response.status, response.statusText);
+        throw new Error(`Failed to complete upload: ${response.statusText}`);
+    }
+    
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n\n');
+        
+        for (const line of lines) {
+            if (line.startsWith('data: ')) {
+                try {
+                    const data = JSON.parse(line.substring(6));
+                    onProgress?.(data);
+                } catch (e) {
+                    console.error('Failed to parse SSE data:', e);
+                }
+            }
+        }
+    }
+    console.log('Upload completion stream finished');
 }
 
 // 分片上传文件
@@ -167,7 +225,7 @@ async function uploadFileInChunks(file, envType, onProgress) {
             
             onProgress?.({
                 progress: Math.min(progress, 60),
-                step: `Uploading chunks (${uploadedChunks}/${totalChunks})`,
+                step: `Uploading (${uploadedChunks}/${totalChunks})`,
                 message: `上传中: ${uploadedMB.toFixed(1)}MB / ${totalMB.toFixed(1)}MB`
             });
             
@@ -431,7 +489,7 @@ export const createEnvironment = async() => {
     }catch(error){
         setError(error.message);
         console.error('Error creating environment:', error);
-        showNotification(`Failed to create ${selectedEnvType.value} environment: ${error.message}`, 'error');
+        showNotification(`Failed to create ${selectedEnvType.value} environment`);
     }
 }
 

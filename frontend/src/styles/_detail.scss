@@ -232,3 +232,37 @@
     font-weight: bold;
   }
 }
+
+/* Log展示区域 */
+.log-section {
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 2px solid #e9ecef;
+  
+  h4 {
+    margin: 0 0 15px 0;
+    color: #333;
+    font-size: 1.1em;
+  }
+}
+
+.log-content-container {
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  padding: 15px;
+  max-height: 500px;
+  overflow-y: auto;
+  overflow-x: auto;
+  
+  .log-text-content {
+    margin: 0;
+    font-family: 'Courier New', 'Monaco', 'Menlo', monospace;
+    font-size: 0.85em;
+    line-height: 1.5;
+    color: #333;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    word-break: break-all;
+  }
+}

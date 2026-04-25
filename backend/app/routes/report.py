@@ -205,6 +205,7 @@ class ReportParser:
 def get_project_report(project_name):
     try:
         logger.info("projectName:" + project_name)
+        project_reports_dir = os.path.join(get_work_dir(), 'Report')
 
         # 获取修复报告
         user_report_path = os.path.join(get_report_base_path(), f"{project_name}.txt")
@@ -213,7 +214,6 @@ def get_project_report(project_name):
             report_filename = f"{project_name}.txt"
         else:
             # 如果用户报告目录中没有，尝试原始报告目录
-            project_reports_dir = os.path.join(get_work_dir(), 'Report')
             report_filename = f"{project_name}.txt"
             report_path = os.path.join(project_reports_dir, report_filename)
 
@@ -229,46 +229,33 @@ def get_project_report(project_name):
         parser = ReportParser(report_path)
         data = parser.parse_report()
         
-        return jsonify({
+        # 尝试读取log文件
+        log_content = None
+        log_filename = f"{project_name}_fixed_log.txt"
+        user_log_path = os.path.join(get_report_base_path(), log_filename)
+        project_log_path = os.path.join(project_reports_dir, log_filename)
+        
+        if os.path.exists(user_log_path):
+            with open(user_log_path, 'r', encoding='utf-8') as f:
+                log_content = f.read()
+        elif os.path.exists(project_log_path):
+            with open(project_log_path, 'r', encoding='utf-8') as f:
+                log_content = f.read()
+        
+        response_data = {
             "data": data,
             "status": "success",
             "report_name": report_filename
-        })
+        }
+        
+        # 如果存在log内容,添加到响应中
+        if log_content is not None:
+            response_data["log_content"] = log_content
+            response_data["log_filename"] = log_filename
+        
+        return jsonify(response_data)
     except Exception as e:
         return jsonify({
             "message": f"Failed to parse report: {str(e)}",
             "status": "error"
         }), 500
-
-# # 按条件过滤报告
-# @report_bp.route('/report/<project_name>/filtered', methods=['POST'])
-# def get_filtered_report(project_name):
-#     try:
-#         filters = request.get_json()
-        
-#         # 构建报告路径
-#         project_reports_dir = os.path.join(get_work_dir(), 'Report')
-#         report_filename = f"{project_name}.txt"
-#         report_path = os.path.join(project_reports_dir, report_filename)
-        
-#         if not os.path.exists(report_path):
-#             return jsonify({
-#                 "message": f"Report {project_name}.txt does not exist",
-#                 "status": "error"
-#             }), 404
-        
-#         # 解析报告
-#         parser = ReportParser(report_path)
-#         data = parser.filter_data(filters)
-        
-#         return jsonify({
-#             "data": data,
-#             "status": "success",
-#             "report_name": report_filename
-#         })
-#     except Exception as e:
-#         return jsonify({
-#             "message": f"Failed to parse report: {str(e)}",
-#             "status": "error"
-#         }), 500
-

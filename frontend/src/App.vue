@@ -190,6 +190,14 @@
                         <div v-else-if="reportData">
                             <p>No API details available in the reportData.</p>
                         </div>
+                        
+                        <!-- Log内容展示(如果存在) -->
+                        <div v-if="logContent" class="log-section">
+                            <h4>Fix Log</h4>
+                            <div class="log-content-container">
+                                <pre class="log-text-content">{{ logContent }}</pre>
+                            </div>
+                        </div>
                     </div>
                     <div v-else class="detail-placeholder">
                         <b>Select a command to view details</b>
@@ -409,7 +417,9 @@ import {
     showAPIDetailModal,
     closeAPIDetailModal,
     showAPIDetail,
-    selectedAPIDetail
+    selectedAPIDetail,
+    logContent,
+    logFilename
 } from './composables/detailManager'
 
 import {

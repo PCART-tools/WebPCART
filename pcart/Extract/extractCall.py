@@ -1,0 +1,98 @@
+## @package extractCall 
+#  Provide some class definitions for extracting lib API calls from project souce files
+#
+#  More details (TODO)
+
+
+
+import ast
+
+
+
+## Import and ImportFrom node visitor
+## Import和ImportFrom节点遍历器
+#
+#  Inherits from ast.NodeVisitor  
+class Import(ast.NodeVisitor):
+    def __init__(self):
+        self._md_name={}
+
+    def get_md_name(self):
+        return self._md_name
+
+    def visit_Import(self, node):
+        item=[nn.__dict__ for nn in node.names] #item中每个元素都是一个字典
+        for it in item:
+            if it["asname"] is None:
+                self._md_name[it["name"]]=it["name"]
+            else:
+                self._md_name[it["asname"]]=it["name"]
+
+    def visit_ImportFrom(self, node):
+        if node.module is not None:
+            item=[nn.__dict__ for nn in node.names]
+            for it in item:
+                if it["asname"] is None:
+                    self._md_name[it["name"]]=node.module+'.'+it["name"]
+                else:
+                    self._md_name[it["asname"]]=node.module+'.'+it["name"]
+
+
+
+## Extract all call type nodes from a project source file
+## 抽取项目源码中的所有call类型节点
+#
+#  Use DFS algorithm to traverse the call type node from the root node. Each API call is stored in a tuple (API name, parameters, call statement, line no) 
+#  从根节点开始，直接找根节点的孩子，Call存在于Expr和Assign节点中。每个API调用存储为四元组(API名称,参数,调用语句,行号)
+class GetFuncCall:
+    def __init__(self):
+        self._func_call=[] #list中每个元素都是一个tuple
+
+    @property
+    def func_call(self):
+        return self._func_call
+
+    #采用深度遍历,先一直往下走
+    #结束条件：遇到Call节点或当前节点无子节点
+    def dfsVisit(self,node):
+        #先递推再回归 
+        for n in ast.iter_child_nodes(node):
+            self.dfsVisit(n)
+        
+        if isinstance(node,ast.Call):
+            callName=ast.unparse(node.func)
+            callState=ast.unparse(node) #还原之后的语句可能和项目中的语句存在差异，比如空格等
+            argLst=[]
+            for arg in node.args:
+                argLst.append(ast.unparse(arg))
+            for keyword in node.keywords:
+                argLst.append(ast.unparse(keyword))
+            parameters=','.join(argLst)
+            if (callName,parameters,callState,node.lineno) not in self._func_call:
+                # print(node.lineno,'<-->',callState)
+                self._func_call.append((callName,parameters,callState,node.lineno)) #四元组：callAPI名，callAPI参数，...
+            else:
+                pass
+                # print(node.lineno,'<-->',callState)
+            return
+
+
+
+## Get all with nodes from a project souce file
+## 项目源码with节点遍历器
+#
+#  For an withitem node, extract the call name in the context_expr and its alias name (if any) in the optional_vars
+#  对于withitem节点，提取其中的call节点和别名（如果有）
+class WithVisitor(ast.NodeVisitor):
+    def __init__(self):
+        self._withitemCall={}
+    
+    def get_withitem_call(self):
+        return self._withitemCall
+
+    def visit_withitem(self, node):
+        if isinstance(node.context_expr, ast.Call):
+            if node.optional_vars:
+                callName =  ast.unparse(node.context_expr)
+                aliasName = ast.unparse(node.optional_vars)
+                self._withitemCall[aliasName] = callName
