@@ -79,3 +79,7 @@ npm run dev:all
    ```bash
    docker-compose up --build
    ```
+
+## License
+
+WebPCART is licensed under the GNU Affero General Public License v3.0. See [LICENSE](./LICENSE) for details.
